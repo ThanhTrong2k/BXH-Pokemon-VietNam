@@ -1,12 +1,26 @@
 from flask import Flask, request, jsonify, render_template_string, send_from_directory
 import json, os, threading
+import traceback, sys, os, json, threading
 
 app = Flask(__name__)
 LOCK = threading.Lock()
 
 # Cho phép cấu hình nơi lưu dữ liệu (Render Disk)
-DB_PATH = os.environ.get("DB_PATH", "db.json")
+DATA_DIR = os.environ.get("DB_DIR", os.environ.get("RENDER_DISK_PATH", "."))
+if not os.path.isdir(DATA_DIR):
+    os.makedirs(DATA_DIR, exist_ok=True)
+DB_PATH = os.environ.get("DB_PATH", os.path.join(DATA_DIR, "db.json"))
 TOKEN   = os.environ.get("API_TOKEN", "POKEMONVIETNAM")
+
+def safe_int(x, default=0):
+    try:
+        return int(str(x).strip())
+    except:
+        return default
+
+def log(msg):
+    print(msg)
+    sys.stdout.flush()
 
 # ===== utils =====
 def load_db():
@@ -30,37 +44,43 @@ def health():
 
 @app.route("/api/report", methods=["POST"])
 def report():
-    # nhận form-urlencoded hoặc JSON
-    data = request.form.to_dict() or (request.get_json(silent=True) or {})
-    if not data:
-        return jsonify(error="no data"), 400
-    if data.get("token") != TOKEN:
-        return jsonify(error="bad token"), 401
+    try:
+        data = request.form.to_dict() or (request.get_json(silent=True) or {})
+        log(f"[REPORT] payload={data}")
 
-    action   = (data.get("action") or "set").lower()
-    name     = (data.get("name")   or "Unknown").strip()[:40]
-    rounds   = int(data.get("rounds")   or 0)
-    kos      = int(data.get("kos")      or 0)
-    trainers = int(data.get("trainers") or 0)
-    extra    = int(data.get("extra")    or 0)
+        if not data:
+            return jsonify(error="no data"), 400
+        if data.get("token") != TOKEN:
+            return jsonify(error="bad token"), 401
 
-    db  = load_db()
-    row = db.get(name, {"rounds":0,"kos":0,"trainers":0,"extra":0})
+        action   = (data.get("action") or "set").lower()
+        name     = (data.get("name")   or "Unknown").strip()[:40]
+        rounds   = safe_int(data.get("rounds"))
+        kos      = safe_int(data.get("kos"))
+        trainers = safe_int(data.get("trainers"))
+        extra    = safe_int(data.get("extra"))
 
-    if action == "delta":
-        row["rounds"]   += rounds
-        row["kos"]      += kos
-        row["trainers"] += trainers
-        row["extra"]    += extra
-    else:  # set
-        row["rounds"]   = rounds
-        row["kos"]      = kos
-        row["trainers"] = trainers
-        row["extra"]    = extra
+        db  = load_db()
+        row = db.get(name, {"rounds":0,"kos":0,"trainers":0,"extra":0})
 
-    db[name] = row
-    save_db(db)
-    return jsonify(ok=True, name=name, **row)
+        if action == "delta":
+            row["rounds"]   += rounds
+            row["kos"]      += kos
+            row["trainers"] += trainers
+            row["extra"]    += extra
+        else:  # set
+            row["rounds"]   = rounds
+            row["kos"]      = kos
+            row["trainers"] = trainers
+            row["extra"]    = extra
+
+        db[name] = row
+        save_db(db)
+        return jsonify(ok=True, name=name, **row)
+    except Exception as e:
+        log(f"[REPORT][ERROR] {e}\n{traceback.format_exc()}")
+        # Trả lỗi có diễn giải thay vì 500 trắng
+        return jsonify(error="internal", detail=str(e)), 500
 
 # ===== View BXH =====
 TPL = """
@@ -131,5 +151,6 @@ def send_form():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
 
