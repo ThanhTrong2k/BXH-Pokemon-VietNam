@@ -1,11 +1,11 @@
 # ==== imports ====
-import os
 import uuid
 import sqlite3
+from flask import Flask, render_template, request, redirect, url_for, make_response, jsonify
+import os
 import re
 from datetime import datetime
 
-from flask import Flask, render_template, request, redirect, url_for, make_response
 from flask_babel import Babel, gettext as _, get_locale
 from werkzeug.utils import secure_filename
 from PIL import Image
@@ -17,6 +17,7 @@ if USING_POSTGRES:
     from psycopg.rows import dict_row
 # ==================================
 
+API_TOKEN = os.getenv("API_TOKEN", "")
 DISABLE_SEED = os.getenv("DISABLE_SEED", "0") == "1"
 
 # ==== Flask app ====
@@ -74,8 +75,10 @@ DB_PATH = os.getenv('DB_PATH', os.path.join(app.root_path, 'leaderboard.db'))
 
 def get_db():
     if USING_POSTGRES:
-        # Neon yêu cầu sslmode=require (đã có trong DATABASE_URL)
-        return psycopg.connect(os.environ["DATABASE_URL"], row_factory=dict_row)
+        dsn = os.environ["DATABASE_URL"]
+        if "connect_timeout" not in dsn:
+            dsn = dsn + ("&" if "?" in dsn else "?") + "connect_timeout=10"
+        return psycopg.connect(dsn, row_factory=dict_row)
     else:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
@@ -152,9 +155,17 @@ init_db()
 if not DISABLE_SEED:
     seed_if_empty()
 # ==================================================
-
-
+def _corsify(resp):
+    resp.headers['Access-Control-Allow-Origin'] = '*'
+    resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    resp.headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
+    return resp
+    
 # ==== Routes ====
+@app.route("/api/report", methods=["OPTIONS"])
+def api_report_preflight():
+    return _corsify(make_response("", 204))
+
 @app.route("/")
 def home():
     return redirect(url_for('board'))
@@ -329,10 +340,135 @@ def upload_team_image():
     return redirect(url_for('board', lang=lang))
 # ==================
 
+@app.post("/api/report")
+def api_report():
+    # ---- auth bằng token ----
+    token = (request.headers.get('Authorization') or '').replace('Bearer ', '').strip()
+    if not token and request.is_json:
+        token = (request.get_json(silent=True) or {}).get('token', '')
+    if not token and request.form:
+        token = request.form.get('token', '')
+    if API_TOKEN and token != API_TOKEN:
+        return _corsify(jsonify({"ok": False, "error": "unauthorized"})), 401
+
+    # ---- đọc data (JSON hoặc form) ----
+    data = request.get_json(silent=True) or request.form.to_dict()
+
+    player = (data.get('player') or '').strip()
+    if not player:
+        return _corsify(jsonify({"ok": False, "error": "player required"})), 400
+
+    def to_int(x):
+        try:
+            return int(x)
+        except Exception:
+            return None
+
+    # set tuyệt đối
+    rounds  = to_int(data.get('rounds'))
+    kos     = to_int(data.get('kos'))
+    trainer = to_int(data.get('trainer'))
+
+    # cộng dồn
+    d_rounds  = to_int(data.get('delta_rounds'))
+    d_kos     = to_int(data.get('delta_kos'))
+    d_trainer = to_int(data.get('delta_trainer'))
+
+    # team names: "A, B, C" (≤6)
+    team_text = None
+    raw_team = (data.get('team_names') or '').strip()
+    if raw_team:
+        names = [re.sub(r'\s+', ' ', s.strip()) for s in re.split(r'[,\n;]+', raw_team) if s.strip()]
+        if len(names) > 6:
+            names = names[:6]
+        team_text = ', '.join(names)
+
+    now = datetime.utcnow().isoformat()
+
+    # ---- upsert vào DB ----
+    if USING_POSTGRES:
+        with get_db() as con, con.cursor() as cur:
+            cur.execute("SELECT id, rounds, kos, trainer FROM leaderboard WHERE player ILIKE %s", (player,))
+            row = cur.fetchone()
+            if row:
+                new_rounds  = row['rounds']  or 0
+                new_kos     = row['kos']     or 0
+                new_trainer = row['trainer'] or 0
+
+                if d_rounds  is not None: new_rounds  += d_rounds
+                if d_kos     is not None: new_kos     += d_kos
+                if d_trainer is not None: new_trainer += d_trainer
+                if rounds  is not None: new_rounds  = rounds
+                if kos     is not None: new_kos     = kos
+                if trainer is not None: new_trainer = trainer
+
+                if team_text is not None:
+                    cur.execute("""UPDATE leaderboard
+                                   SET rounds=%s, kos=%s, trainer=%s, team=%s, updated_at=%s
+                                   WHERE id=%s""",
+                                (new_rounds, new_kos, new_trainer, team_text, now, row['id']))
+                else:
+                    cur.execute("""UPDATE leaderboard
+                                   SET rounds=%s, kos=%s, trainer=%s, updated_at=%s
+                                   WHERE id=%s""",
+                                (new_rounds, new_kos, new_trainer, now, row['id']))
+            else:
+                cur.execute("SELECT COALESCE(MAX(rank),0)+1 AS n FROM leaderboard")
+                next_rank = cur.fetchone()["n"]
+                cur.execute("""INSERT INTO leaderboard (rank, player, rounds, kos, trainer, team, updated_at)
+                               VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+                            (next_rank, player,
+                             rounds or d_rounds or 0,
+                             kos or d_kos or 0,
+                             trainer or d_trainer or 0,
+                             team_text, now))
+            con.commit()
+    else:
+        with get_db() as con:
+            row = con.execute("SELECT id, rounds, kos, trainer FROM leaderboard WHERE player = ? COLLATE NOCASE",
+                              (player,)).fetchone()
+            if row:
+                new_rounds  = row['rounds']  or 0
+                new_kos     = row['kos']     or 0
+                new_trainer = row['trainer'] or 0
+
+                if d_rounds  is not None: new_rounds  += d_rounds
+                if d_kos     is not None: new_kos     += d_kos
+                if d_trainer is not None: new_trainer += d_trainer
+                if rounds  is not None: new_rounds  = rounds
+                if kos     is not None: new_kos     = kos
+                if trainer is not None: new_trainer = trainer
+
+                if team_text is not None:
+                    con.execute("""UPDATE leaderboard
+                                   SET rounds=?, kos=?, trainer=?, team=?, updated_at=?
+                                   WHERE id=?""",
+                                (new_rounds, new_kos, new_trainer, team_text, now, row['id']))
+                else:
+                    con.execute("""UPDATE leaderboard
+                                   SET rounds=?, kos=?, trainer=?, updated_at=?
+                                   WHERE id=?""",
+                                (new_rounds, new_kos, new_trainer, now, row['id']))
+            else:
+                next_rank = con.execute("SELECT COALESCE(MAX(rank),0)+1 AS n FROM leaderboard").fetchone()["n"]
+                con.execute("""INSERT INTO leaderboard (rank, player, rounds, kos, trainer, team, updated_at)
+                               VALUES (?,?,?,?,?,?,?)""",
+                            (next_rank, player,
+                             rounds or d_rounds or 0,
+                             kos or d_kos or 0,
+                             trainer or d_trainer or 0,
+                             team_text, now))
+
+    return _corsify(jsonify({"ok": True})), 200
+
+@app.get("/health")
+def health():
+    return "ok", 200
 
 if __name__ == "__main__":
     # Local dev
     app.run(debug=True)
+
 
 
 
