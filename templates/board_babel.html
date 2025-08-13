@@ -103,9 +103,9 @@
       <h1>{{ _('Global Rankings') }}</h1>
       <p>{{ _('Aggregated from PC & Android (Joiplay). Click a player to see match details.') }}</p>
       <div class="chips">
-        <span class="chip">{{ _('Rounds') }}</span>
-        <span class="chip">{{ _('Pokémon KOs') }}</span>
-        <span class="chip">{{ _('Reached Trainer') }}</span>
+        <span class="chip">{{ _('Rounds') }}: {{ total_rounds }}</span>
+        <span class="chip">{{ _('KOs') }}: {{ total_kos }}</span>
+        <span class="chip">{{ _('Trainers passed') }}: {{ total_trainers }}</span>
       </div>
     </section>
 
@@ -192,9 +192,6 @@
       </table>
     </section>
 
-    <footer class="footer">
-      {{ _('Data synced from PC & Android (Joiplay). This is a demo UI — plug your real API to go live.') }}
-    </footer>
   </div>
 
   <script>
@@ -228,3 +225,4 @@
 
 </body>
 </html>
+
