@@ -79,16 +79,35 @@
             <div style="font-weight:800">{{ _('Upload Team Image') }}</div>
             <button class="btn" style="padding:6px 10px" onclick="closeUpload()">×</button>
           </div>
-          <form id="uploadForm" method="post" action="/upload" enctype="multipart/form-data">
+          <form id="uploadForm"
+                method="post"
+                action="{{ url_for('upload_team_image', lang=get_locale()) }}"
+                enctype="multipart/form-data"
+                onsubmit="return validateTeamNames()">
             <div style="display:grid;gap:10px">
+
+              <!-- Player name (optional) -->
               <label style="display:grid;gap:6px">
                 <span class="muted">{{ _('Player name (optional)') }}</span>
-                <input name="player" type="text" placeholder="Player_X" style="padding:10px;border-radius:10px;border:1px solid #2b3a62;background:#101833;color:#e6eeff">
+                <input name="player" type="text" placeholder="Player_X"
+                       style="padding:10px;border-radius:10px;border:1px solid #2b3a62;background:#101833;color:#e6eeff">
               </label>
+
+              <!-- NEW: Team names (REQUIRED 1..6) -->
+              <label style="display:grid;gap:6px">
+                <span class="muted">{{ _('Team (1–6 Pokémon)') }}</span>
+                <input id="team_names" name="team_names" type="text" required
+                       placeholder="Pikachu, Charizard, Gardevoir (1–6, cách nhau bằng dấu phẩy)"
+                       style="padding:10px;border-radius:10px;border:1px solid #2b3a62;background:#101833;color:#e6eeff">
+              </label>
+
+              <!-- Image (optional) -->
               <label style="display:grid;gap:6px">
                 <span class="muted">{{ _('Team image (PNG/JPG/WebP, ≤5MB)') }}</span>
-                <input name="image" type="file" accept=".png,.jpg,.jpeg,.webp" required style="padding:8px;border-radius:10px;border:1px solid #2b3a62;background:#101833;color:#e6eeff">
+                <input name="image" type="file" accept=".png,.jpg,.jpeg,.webp"
+                       style="padding:8px;border-radius:10px;border:1px solid #2b3a62;background:#101833;color:#e6eeff">
               </label>
+
               <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
                 <button type="button" class="btn" onclick="closeUpload()">{{ _('Cancel') }}</button>
                 <button type="submit" class="btn">{{ _('Upload') }}</button>
@@ -210,6 +229,17 @@
 	function closeUpload(){
       const m = document.getElementById('uploadModal');
       if (m) m.style.display = 'none';
+    }
+	
+	function validateTeamNames(){
+      const raw = (document.getElementById('team_names')?.value || '');
+      const names = raw.split(/[,\n;]+/).map(s => s.trim()).filter(Boolean);
+      if (names.length === 0 || names.length > 6) {
+        alert('Vui lòng nhập từ 1 đến 6 tên Pokémon, cách nhau bằng dấu phẩy.');
+        return false;
+      }
+      for (const n of names) { if (n.length > 30) { alert('Tên Pokémon quá dài.'); return false; } }
+      return true;
     }
 	
 	// (khuyên dùng) UX: bấm Esc hoặc click nền tối để đóng modal
