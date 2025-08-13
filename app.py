@@ -170,7 +170,14 @@ def board():
     # --- lấy số liệu tổng + top 3 ---
     if USING_POSTGRES:
         with get_db() as con, con.cursor() as cur:
-            cur.execute("SELECT COUNT(*) AS players, COALESCE(SUM(rounds),0) AS total_rounds FROM leaderboard")
+            cur.execute("""
+                SELECT
+                  COUNT(*)                    AS players,
+                  COALESCE(SUM(rounds), 0)    AS total_rounds,
+                  COALESCE(SUM(kos), 0)       AS total_kos,
+                  COALESCE(SUM(trainer), 0)   AS total_trainers
+                FROM leaderboard
+            """)
             stats = cur.fetchone()
 
             cur.execute("""
@@ -189,9 +196,14 @@ def board():
             rows = cur.fetchall()
     else:
         with get_db() as con:
-            stats = con.execute(
-                "SELECT COUNT(*) AS players, COALESCE(SUM(rounds),0) AS total_rounds FROM leaderboard"
-            ).fetchone()
+            stats = con.execute("""
+                SELECT
+                  COUNT(*)                    AS players,
+                  COALESCE(SUM(rounds), 0)    AS total_rounds,
+                  COALESCE(SUM(kos), 0)       AS total_kos,
+                  COALESCE(SUM(trainer), 0)   AS total_trainers
+                FROM leaderboard
+            """).fetchone()
 
             top3_rows = con.execute("""
                 SELECT rank, player, trainer, rounds, kos, team, team_img, updated_at
@@ -224,12 +236,16 @@ def board():
 
     players_count = int(stats["players"])
     total_rounds = int(stats["total_rounds"] or 0)
+    total_kos       = int(stats["total_kos"] or 0)
+    total_trainers  = int(stats["total_trainers"] or 0)
 
     return render_template(
         "board_babel.html",
         leaderboard=leaderboard,
         players_count=players_count,
         total_rounds=total_rounds,
+        total_kos=total_kos,
+        total_trainers=total_trainers,
         top3=top3,
     )
 
@@ -298,3 +314,4 @@ def upload_team_image():
 if __name__ == "__main__":
     # Local dev
     app.run(debug=True)
+
