@@ -2,6 +2,7 @@
 import os
 import uuid
 import sqlite3
+import re
 from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, make_response
@@ -253,61 +254,77 @@ def board():
 
 @app.post("/upload")
 def upload_team_image():
-    # giữ ngôn ngữ hiện tại sau khi upload
     lang = request.args.get('lang')
-
     player = (request.form.get('player') or '').strip() or 'Unknown'
-    file = request.files.get('image')
 
-    if not file or file.filename == '' or not allowed_file(file.filename):
+    # Parse team names (REQUIRED 1..6)
+    raw_team = (request.form.get('team_names') or '').strip()
+    names = [re.sub(r'\s+', ' ', s.strip()) for s in re.split(r'[,\n;]+', raw_team) if s.strip()]
+    if len(names) == 0 or len(names) > 6:
         return redirect(url_for('board', lang=lang))
+    team_text = ', '.join(names)
 
-    ext = file.filename.rsplit('.', 1)[1].lower()
-    safe = secure_filename(os.path.splitext(file.filename)[0])[:32]
-    fname = f"{safe}-{uuid.uuid4().hex[:8]}.{ext}"
+    # Image OPTIONAL
+    file = request.files.get('image')
+    fname = None
+    if file and file.filename and allowed_file(file.filename):
+        ext = file.filename.rsplit('.', 1)[1].lower()
+        safe = secure_filename(os.path.splitext(file.filename)[0])[:32]
+        fname = f"{safe}-{uuid.uuid4().hex[:8]}.{ext}"
 
-    # Lưu ảnh + thumbnail (ephemeral trên PaaS)
-    save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
-    file.save(save_path)
-    try:
-        thumb_path = os.path.join(app.config['THUMB_FOLDER'], fname)
-        make_thumb(save_path, thumb_path, size=(48, 48))
-    except Exception:
-        pass
+        save_path = os.path.join(app.config['UPLOAD_FOLDER'], fname)
+        file.save(save_path)
+        try:
+            thumb_path = os.path.join(app.config['THUMB_FOLDER'], fname)
+            make_thumb(save_path, thumb_path, size=(48, 48))
+        except Exception:
+            pass
 
-    # Cập nhật DB: nếu có player thì update ảnh, không có thì chèn mới với rank kế tiếp
+    now = datetime.utcnow().isoformat()
+
     if USING_POSTGRES:
         with get_db() as con, con.cursor() as cur:
-            # tìm theo player không phân biệt hoa/thường
             cur.execute("SELECT id FROM leaderboard WHERE player ILIKE %s", (player,))
             row = cur.fetchone()
             if row:
-                cur.execute(
-                    "UPDATE leaderboard SET team_img=%s, updated_at=%s WHERE id=%s",
-                    (fname, datetime.utcnow().isoformat(), row["id"])
-                )
+                if fname:
+                    cur.execute("UPDATE leaderboard SET team=%s, team_img=%s, updated_at=%s WHERE id=%s",
+                                (team_text, fname, now, row["id"]))
+                else:
+                    cur.execute("UPDATE leaderboard SET team=%s, updated_at=%s WHERE id=%s",
+                                (team_text, now, row["id"]))
             else:
                 cur.execute("SELECT COALESCE(MAX(rank),0)+1 AS n FROM leaderboard")
                 next_rank = cur.fetchone()["n"]
-                cur.execute(
-                    "INSERT INTO leaderboard (rank, player, team_img, updated_at) VALUES (%s,%s,%s,%s)",
-                    (next_rank, player, fname, datetime.utcnow().isoformat())
-                )
+                if fname:
+                    cur.execute("""INSERT INTO leaderboard (rank, player, team, team_img, updated_at)
+                                   VALUES (%s,%s,%s,%s,%s)""",
+                                (next_rank, player, team_text, fname, now))
+                else:
+                    cur.execute("""INSERT INTO leaderboard (rank, player, team, updated_at)
+                                   VALUES (%s,%s,%s,%s)""",
+                                (next_rank, player, team_text, now))
             con.commit()
     else:
         with get_db() as con:
             row = con.execute("SELECT id FROM leaderboard WHERE player = ? COLLATE NOCASE", (player,)).fetchone()
             if row:
-                con.execute(
-                    "UPDATE leaderboard SET team_img=?, updated_at=? WHERE id=?",
-                    (fname, datetime.utcnow().isoformat(), row["id"])
-                )
+                if fname:
+                    con.execute("UPDATE leaderboard SET team=?, team_img=?, updated_at=? WHERE id=?",
+                                (team_text, fname, now, row["id"]))
+                else:
+                    con.execute("UPDATE leaderboard SET team=?, updated_at=? WHERE id=?",
+                                (team_text, now, row["id"]))
             else:
                 next_rank = con.execute("SELECT COALESCE(MAX(rank),0)+1 AS n FROM leaderboard").fetchone()["n"]
-                con.execute(
-                    "INSERT INTO leaderboard (rank, player, team_img, updated_at) VALUES (?,?,?,?)",
-                    (next_rank, player, fname, datetime.utcnow().isoformat())
-                )
+                if fname:
+                    con.execute("""INSERT INTO leaderboard (rank, player, team, team_img, updated_at)
+                                   VALUES (?,?,?,?,?)""",
+                                (next_rank, player, team_text, fname, now))
+                else:
+                    con.execute("""INSERT INTO leaderboard (rank, player, team, updated_at)
+                                   VALUES (?,?,?,?)""",
+                                (next_rank, player, team_text, now))
 
     return redirect(url_for('board', lang=lang))
 # ==================
@@ -316,5 +333,6 @@ def upload_team_image():
 if __name__ == "__main__":
     # Local dev
     app.run(debug=True)
+
 
 
