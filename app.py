@@ -97,7 +97,39 @@ def board():
 @app.route("/static/<path:fname>")
 def static_files(fname):
     return send_from_directory("static", fname)
+# --- Xem DB thô ---
+@app.route("/api/raw")
+def raw():
+    return jsonify(load_db())
+
+# --- Reset DB (chỉ cho chủ) ---
+@app.route("/api/clear", methods=["POST"])
+def clear():
+    if (request.form.get("token") or "") != TOKEN:
+        return jsonify(error="bad token"), 401
+    save_db({})
+    return jsonify(ok=True)
+
+# --- Form gửi tay để test ---
+FORM = """
+<!doctype html><meta charset="utf-8"><title>Send</title>
+<h3>Gửi BXH (test)</h3>
+<form method="post" action="/api/report">
+  <input type="hidden" name="token" value='""" + TOKEN + """'>
+  Action: <select name="action"><option>set</option><option>delta</option></select><br>
+  Name: <input name="name" value="TEST_PC"><br>
+  Rounds: <input name="rounds" value="5"><br>
+  KOs: <input name="kos" value="2"><br>
+  Trainers: <input name="trainers" value="1"><br>
+  Extra: <input name="extra" value="0"><br>
+  <button type="submit">Send</button>
+</form>
+"""
+@app.route("/send")
+def send_form():
+    return FORM
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
