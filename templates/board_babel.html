@@ -1,0 +1,236 @@
+<!doctype html>
+{% set cur = (get_locale() | string) %}
+<html lang="{{ cur if cur else 'vi' }}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{ _('Leaderboard') }}</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0b1020;--card:#121a33cc;--muted:#8da2c0;--text:#e6eeff;--accent:#6aa3ff;--accent-2:#8b5cf6;--radius:16px;--ring:0 0 0 3px rgba(106,163,255,.35);--glass-blur:saturate(160%) blur(6px)}
+    *{box-sizing:border-box}html,body{height:100%}
+    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text);
+      background:radial-gradient(1200px 600px at -10% -10%,#1a2455 0%,transparent 60%),
+                 radial-gradient(1200px 600px at 110% 10%,#2a3f83 0%,transparent 60%),
+                 radial-gradient(1200px 800px at 50% 120%,#1a2f5a 0%,transparent 60%),var(--bg)}
+    .shell{max-width:1200px;margin:0 auto;padding:24px}
+    header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:20px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{inline-size:40px;block-size:40px;border-radius:10px;display:grid;place-items:center;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      box-shadow:0 10px 30px rgba(107,114,255,.35),inset 0 0 24px rgba(255,255,255,.15)}
+    .title{font-weight:800;font-size:1.25rem;letter-spacing:.2px}
+    .muted{color:var(--muted);font-size:.95rem}
+    .toolbar{display:flex;gap:10px;align-items:center}
+    .select{appearance:none;border:1px solid #2b3a62;background:#101833;color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer;outline:none}
+    .btn{border:none;border-radius:12px;padding:10px 14px;color:white;cursor:pointer;font-weight:600;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 8px 20px rgba(106,163,255,.35);
+      transition:transform .12s ease,box-shadow .12s ease}
+    .btn:hover{transform:translateY(-1px)}.btn:focus-visible{box-shadow:var(--ring)}
+    .hero{position:relative;overflow:hidden;border-radius:var(--radius);padding:22px 20px;background:#0f1732a6;backdrop-filter:var(--glass-blur);border:1px solid #263159}
+    .hero h1{margin:0 0 6px 0;font-size:1.6rem}.hero p{margin:0;color:var(--muted)}
+    .chips{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
+    .chip{border:1px solid #2b3a62;border-radius:999px;padding:6px 10px;color:#c9d6ff;background:#0e1631c2;font-size:.85rem}
+    .grid{display:grid;gap:16px;margin-top:18px;grid-template-columns:repeat(12,1fr)}
+    @media (max-width:960px){.grid{grid-template-columns:repeat(6,1fr)}}
+    @media (max-width:640px){.grid{grid-template-columns:repeat(1,1fr)}}
+    .card{grid-column:span 4;min-height:160px;background:#0f1732a6;backdrop-filter:var(--glass-blur);border:1px solid #263159;border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px}
+    .card--wide{grid-column:span 8}.card__head{display:flex;align-items:center;justify-content:space-between}
+    .card__title{font-weight:700}.kpi{font-size:2rem;font-weight:800}.sub{color:var(--muted);font-size:.9rem}
+    .table{width:100%;border-collapse:collapse;font-size:.95rem}
+    .table th,.table td{padding:10px;border-bottom:1px solid #22305a}
+    .table th{color:#a9b8e8;text-align:left;font-weight:700}
+    .row{display:flex;align-items:center;gap:10px}
+    .rank{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:#101a3a;border:1px solid #2b3a62;color:#cfe0ff;font-weight:700}
+    .tag{border:1px solid #2b3a62;border-radius:8px;padding:4px 8px;color:#cfe0ff;background:#0e1631c2;font-size:.8rem}
+    .footer{margin:22px 0 8px 0;color:#90a1c9;font-size:.85rem;opacity:.9}
+	.teamcell{display:flex;align-items:center;gap:8px}
+    .teamcell img{width:28px;height:28px;border-radius:6px;border:1px solid #2b3a62;background:#0e1631}
+
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2l2.2 5.9L20 10l-5.8 2.2L12 18l-2.2-5.8L4 10l5.8-2.1L12 2z" stroke="white" stroke-width="1.5"/>
+          </svg>
+        </div>
+        <div>
+          <div class="title">{{ _('Leaderboard') }}</div>
+          <div class="muted">{{ _('Live player progress') }}</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <select class="select" onchange="onLangChange(this.value)">
+          <option value="vi" {% if cur == 'vi' %}selected{% endif %}>Tiếng Việt</option>
+          <option value="en" {% if cur == 'en' %}selected{% endif %}>English</option>
+        </select>
+		<button class="btn" onclick="openUpload()">{{ _('Upload Team Image') }}</button>
+        <button class="btn">{{ _('New Match') }}</button>
+      </div>
+      <!-- Modal upload -->
+      <div id="uploadModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,10,25,.55);backdrop-filter:blur(3px);z-index:9999">
+        <div style="width:min(520px,92vw);background:#0f1732; border:1px solid #263159; border-radius:16px; padding:16px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px">
+            <div style="font-weight:800">{{ _('Upload Team Image') }}</div>
+            <button class="btn" style="padding:6px 10px" onclick="closeUpload()">×</button>
+          </div>
+          <form id="uploadForm" method="post" action="/upload" enctype="multipart/form-data">
+            <div style="display:grid;gap:10px">
+              <label style="display:grid;gap:6px">
+                <span class="muted">{{ _('Player name (optional)') }}</span>
+                <input name="player" type="text" placeholder="Player_X" style="padding:10px;border-radius:10px;border:1px solid #2b3a62;background:#101833;color:#e6eeff">
+              </label>
+              <label style="display:grid;gap:6px">
+                <span class="muted">{{ _('Team image (PNG/JPG/WebP, ≤5MB)') }}</span>
+                <input name="image" type="file" accept=".png,.jpg,.jpeg,.webp" required style="padding:8px;border-radius:10px;border:1px solid #2b3a62;background:#101833;color:#e6eeff">
+              </label>
+              <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+                <button type="button" class="btn" onclick="closeUpload()">{{ _('Cancel') }}</button>
+                <button type="submit" class="btn">{{ _('Upload') }}</button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </header>
+
+    <section class="hero">
+      <h1>{{ _('Global Rankings') }}</h1>
+      <p>{{ _('Aggregated from PC & Android (Joiplay). Click a player to see match details.') }}</p>
+      <div class="chips">
+        <span class="chip">{{ _('Rounds') }}</span>
+        <span class="chip">{{ _('Pokémon KOs') }}</span>
+        <span class="chip">{{ _('Reached Trainer') }}</span>
+      </div>
+    </section>
+
+    <section class="grid" aria-label="KPI cards">
+      <article class="card">
+        <div class="card__head">
+          <div class="card__title">{{ _('Players') }}</div>
+          <span class="tag">+5 today</span>
+        </div>
+        <div class="kpi">128</div>
+        <div class="sub">{{ _('Uploaded progress') }}</div>
+      </article>
+
+      <article class="card">
+        <div class="card__head">
+          <div class="card__title">{{ _('Total Matches') }}</div>
+          <span class="tag">+12</span>
+        </div>
+        <div class="kpi">1,942</div>
+        <div class="sub">{{ _('From all players') }}</div>
+      </article>
+
+      <article class="card card--wide">
+        <div class="card__head">
+          <div class="card__title">{{ _('Form Top') }}</div>
+          <button class="btn" style="padding:8px 12px">{{ _('Refresh') }}</button>
+        </div>
+        <div class="sub">{{ _('Top 3 most efficient recent matches') }}</div>
+        <div class="row">
+          <span class="rank">1</span>
+          <span>Player_A</span>
+          <span class="tag">R: 5</span>
+          <span class="tag">KOs: 0</span>
+          <span class="tag">T7</span>
+        </div>
+        <div class="row">
+          <span class="rank">2</span>
+          <span>Player_B</span>
+          <span class="tag">R: 6</span>
+          <span class="tag">KOs: 1</span>
+          <span class="tag">T8</span>
+        </div>
+        <div class="row">
+          <span class="rank">3</span>
+          <span>Player_C</span>
+          <span class="tag">R: 4</span>
+          <span class="tag">KOs: 0</span>
+          <span class="tag">T6</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <div class="card__head">
+        <div class="card__title">{{ _('Leaderboard') }}</div>
+      </div>
+      <table class="table" id="leaderboard">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>{{ _('Player') }}</th>
+            <th>{{ _('Trainer') }}</th>
+            <th>{{ _('Rounds') }}</th>
+            <th>{{ _('KOs') }}</th>
+            <th>{{ _('Team') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in leaderboard %}
+          <tr>
+            <td>{{ row.rank }}</td>
+            <td>{{ row.player }}</td>
+            <td>{{ row.trainer }}</td>
+            <td>{{ row.rounds }}</td>
+            <td>{{ row.kos }}</td>
+
+          <!-- Cột Đội hình + thumbnail -->
+          <td class="teamcell">
+            {% if row.team_thumb_url %}
+              <a href="{{ row.team_img_url }}" target="_blank" title="Open full image">
+                <img src="{{ row.team_thumb_url }}" alt="Team image">
+              </a>
+            {% endif %}
+            <span>{{ row.team }}</span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+
+      </table>
+    </section>
+
+    <footer class="footer">
+      {{ _('Data synced from PC & Android (Joiplay). This is a demo UI — plug your real API to go live.') }}
+    </footer>
+  </div>
+
+  <script>
+    function onLangChange(value){
+      // đổi bằng cookie route
+      location.href = "/set-language/" + value;
+      // hoặc nếu bạn muốn dùng query ?lang=:
+      // const u = new URL(location.href); u.searchParams.set('lang', value); location.href = u.toString();
+    }
+	
+    function openUpload(){
+      const m = document.getElementById('uploadModal');
+	  if (m) m.style.display = 'flex';
+    }
+	
+	function closeUpload(){
+      const m = document.getElementById('uploadModal');
+      if (m) m.style.display = 'none';
+    }
+	
+	// (khuyên dùng) UX: bấm Esc hoặc click nền tối để đóng modal
+    document.addEventListener('keydown', (e)=>{
+      if (e.key === 'Escape') closeUpload();
+    });
+    document.addEventListener('click', (e)=>{
+      const m = document.getElementById('uploadModal');
+      if (!m) return;
+      if (m.style.display === 'flex' && e.target === m) closeUpload();
+    });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,109 @@
+# Vietnamese translations for PROJECT.
+# Copyright (C) 2025 ORGANIZATION
+# This file is distributed under the same license as the PROJECT project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2025.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: PROJECT VERSION\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2025-08-13 07:05+0700\n"
+"PO-Revision-Date: 2025-08-13 07:05+0700\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: vi\n"
+"Language-Team: vi <LL@li.org>\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.17.0\n"
+
+#: templates/board_babel.html:6 templates/board_babel.html:84
+#: templates/board_babel.html:159
+msgid "Leaderboard"
+msgstr "Bảng xếp hạng"
+
+#: templates/board_babel.html:85
+msgid "Live player progress"
+msgstr "Cập nhật theo tiến trình người chơi"
+
+#: templates/board_babel.html:94
+msgid "New Match"
+msgstr "Thêm trận mới"
+
+#: templates/board_babel.html:99
+msgid "Global Rankings"
+msgstr "Xếp hạng toàn game"
+
+#: templates/board_babel.html:100
+msgid ""
+"Aggregated from PC & Android (Joiplay). Click a player to see match "
+"details."
+msgstr ""
+"Tổng hợp từ PC & Android (Joiplay). Nhấp vào người chơi để xem chi "
+"tiết từng trận."
+
+#: templates/board_babel.html:102 templates/board_babel.html:167
+msgid "Rounds"
+msgstr "Số lượt"
+
+#: templates/board_babel.html:103
+msgid "Pokémon KOs"
+msgstr "Pokemon ngất"
+
+#: templates/board_babel.html:104
+msgid "Reached Trainer"
+msgstr "Số Trainer đã qua"
+
+#: templates/board_babel.html:111
+msgid "Players"
+msgstr "Người chơi"
+
+#: templates/board_babel.html:115
+msgid "Uploaded progress"
+msgstr "Đã upload tiến trình"
+
+#: templates/board_babel.html:120
+msgid "Total Matches"
+msgstr "Tổng trận"
+
+#: templates/board_babel.html:124
+msgid "From all players"
+msgstr "Từ tất cả người chơi"
+
+#: templates/board_babel.html:129
+msgid "Form Top"
+msgstr "Top phong độ"
+
+#: templates/board_babel.html:130
+msgid "Refresh"
+msgstr "Làm mới"
+
+#: templates/board_babel.html:132
+msgid "Top 3 most efficient recent matches"
+msgstr "Top 3 trận đấu hay nhẩt gần đây"
+
+#: templates/board_babel.html:165
+msgid "Player"
+msgstr "Người chơi"
+
+#: templates/board_babel.html:166
+msgid "Trainer"
+msgstr "Trainer"
+
+#: templates/board_babel.html:168
+msgid "KOs"
+msgstr "Gục"
+
+#: templates/board_babel.html:169
+msgid "Team"
+msgstr "Đội hình"
+
+#: templates/board_babel.html:188
+msgid ""
+"Data synced from PC & Android (Joiplay). This is a demo UI — plug your "
+"real API to go live."
+msgstr ""
+"Dữ liệu được đồng bộ từ PC & Android (Joiplay). Trang này là giao diện "
+"demo — gắn API thật để chạy live."
+

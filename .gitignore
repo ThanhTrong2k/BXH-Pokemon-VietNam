@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.venv/
+env/
+venv/
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# App data (không đẩy DB và ảnh lên git)
+leaderboard.db
+static/uploads/
