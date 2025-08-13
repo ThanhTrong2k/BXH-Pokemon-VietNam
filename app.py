@@ -16,6 +16,7 @@ if USING_POSTGRES:
     from psycopg.rows import dict_row
 # ==================================
 
+DISABLE_SEED = os.getenv("DISABLE_SEED", "0") == "1"
 
 # ==== Flask app ====
 app = Flask(__name__)
@@ -147,7 +148,8 @@ def seed_if_empty():
 
 # tạo bảng + seed ngay khi app khởi động
 init_db()
-seed_if_empty()
+if not DISABLE_SEED:
+    seed_if_empty()
 # ==================================================
 
 
@@ -314,4 +316,5 @@ def upload_team_image():
 if __name__ == "__main__":
     # Local dev
     app.run(debug=True)
+
 
