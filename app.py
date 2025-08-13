@@ -167,27 +167,48 @@ def set_language(lang_code):
 
 @app.route("/board")
 def board():
-    # Lấy dữ liệu BXH
+    # --- lấy số liệu tổng + top 3 ---
     if USING_POSTGRES:
         with get_db() as con, con.cursor() as cur:
+            cur.execute("SELECT COUNT(*) AS players, COALESCE(SUM(rounds),0) AS total_rounds FROM leaderboard")
+            stats = cur.fetchone()
+
+            cur.execute("""
+                SELECT rank, player, trainer, rounds, kos, team, team_img, updated_at
+                FROM leaderboard
+                ORDER BY COALESCE(updated_at,'1970-01-01') DESC, rank ASC
+                LIMIT 3
+            """)
+            top3_rows = cur.fetchall()
+
             cur.execute("""
                 SELECT rank, player, trainer, rounds, kos, team, team_img
                 FROM leaderboard
                 ORDER BY rank ASC, player ASC
             """)
             rows = cur.fetchall()
-            leaderboard = [dict(r) for r in rows]
     else:
         with get_db() as con:
+            stats = con.execute(
+                "SELECT COUNT(*) AS players, COALESCE(SUM(rounds),0) AS total_rounds FROM leaderboard"
+            ).fetchone()
+
+            top3_rows = con.execute("""
+                SELECT rank, player, trainer, rounds, kos, team, team_img, updated_at
+                FROM leaderboard
+                ORDER BY COALESCE(updated_at,'1970-01-01') DESC, rank ASC
+                LIMIT 3
+            """).fetchall()
+
             rows = con.execute("""
                 SELECT rank, player, trainer, rounds, kos, team, team_img
                 FROM leaderboard
                 ORDER BY rank ASC, player ASC
             """).fetchall()
-            leaderboard = [dict(r) for r in rows]
 
-    # Fallback ảnh: chỉ gắn URL nếu file còn trên đĩa
-    for d in leaderboard:
+    # --- gắn URL ảnh nếu file còn tồn tại ---
+    def attach_img_urls(r):
+        d = dict(r)
         d["team_thumb_url"] = None
         d["team_img_url"] = None
         fn = d.get("team_img")
@@ -196,9 +217,21 @@ def board():
             if os.path.isfile(full_path):
                 d["team_img_url"] = url_for('static', filename='uploads/' + fn)
                 d["team_thumb_url"] = url_for('static', filename='uploads/thumbs/' + fn)
+        return d
 
-    return render_template("board_babel.html", leaderboard=leaderboard)
+    leaderboard = [attach_img_urls(r) for r in rows]
+    top3 = [attach_img_urls(r) for r in top3_rows]
 
+    players_count = int(stats["players"])
+    total_rounds = int(stats["total_rounds"] or 0)
+
+    return render_template(
+        "board_babel.html",
+        leaderboard=leaderboard,
+        players_count=players_count,
+        total_rounds=total_rounds,
+        top3=top3,
+    )
 
 @app.post("/upload")
 def upload_team_image():
@@ -261,11 +294,7 @@ def upload_team_image():
     return redirect(url_for('board', lang=lang))
 # ==================
 
-@app.get("/health")
-def health():
-    return "ok", 200
 
 if __name__ == "__main__":
     # Local dev
     app.run(debug=True)
-
