@@ -110,51 +110,45 @@
     </section>
 
     <section class="grid" aria-label="KPI cards">
+      <!-- KPI: Players -->
       <article class="card">
         <div class="card__head">
           <div class="card__title">{{ _('Players') }}</div>
-          <span class="tag">+5 today</span>
         </div>
-        <div class="kpi">128</div>
+        <div class="kpi">{{ players_count }}</div>
         <div class="sub">{{ _('Uploaded progress') }}</div>
       </article>
 
+      <!-- KPI: Total Matches -->
       <article class="card">
         <div class="card__head">
           <div class="card__title">{{ _('Total Matches') }}</div>
-          <span class="tag">+12</span>
         </div>
-        <div class="kpi">1,942</div>
+        <div class="kpi">{{ "{:,}".format(total_rounds) }}</div>
         <div class="sub">{{ _('From all players') }}</div>
       </article>
 
+      <!-- Form Top (Top 3 vừa cập nhật gần nhất) -->
       <article class="card card--wide">
         <div class="card__head">
           <div class="card__title">{{ _('Form Top') }}</div>
-          <button class="btn" style="padding:8px 12px">{{ _('Refresh') }}</button>
+          <button class="btn" style="padding:8px 12px" onclick="location.reload()">{{ _('Refresh') }}</button>
         </div>
         <div class="sub">{{ _('Top 3 most efficient recent matches') }}</div>
-        <div class="row">
-          <span class="rank">1</span>
-          <span>Player_A</span>
-          <span class="tag">R: 5</span>
-          <span class="tag">KOs: 0</span>
-          <span class="tag">T7</span>
-        </div>
-        <div class="row">
-          <span class="rank">2</span>
-          <span>Player_B</span>
-          <span class="tag">R: 6</span>
-          <span class="tag">KOs: 1</span>
-          <span class="tag">T8</span>
-        </div>
-        <div class="row">
-          <span class="rank">3</span>
-          <span>Player_C</span>
-          <span class="tag">R: 4</span>
-          <span class="tag">KOs: 0</span>
-          <span class="tag">T6</span>
-        </div>
+
+        {% for r in top3 %}
+          <div class="row">
+            <span class="rank">{{ loop.index }}</span>
+            <span>{{ r.player }}</span>
+            <span class="tag">R: {{ r.rounds or 0 }}</span>
+            <span class="tag">KOs: {{ r.kos or 0 }}</span>
+            <span class="tag">T{{ r.trainer or 0 }}</span>
+          </div>
+        {% else %}
+          <div class="row">
+            <span class="sub">{{ _('No data yet') }}</span>
+          </div>
+        {% endfor %}
       </article>
     </section>
 
