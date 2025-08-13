@@ -69,11 +69,14 @@ TPL = """
 <h2>BXH Pokémon Việt Nam</h2>
 <table border=1 cellpadding=6 cellspacing=0>
 <tr><th>#</th><th>Tên</th><th>Rounds</th><th>KOs</th><th>Trainers</th><th>Extra</th></tr>
-{% for i,(name,row) in enumerate(rows,1) %}
+{% for name, row in rows %}
 <tr>
-<td>{{i}}</td><td>{{name}}</td>
-<td>{{row.rounds}}</td><td>{{row.kos}}</td>
-<td>{{row.trainers}}</td><td>{{row.extra}}</td>
+  <td>{{ loop.index }}</td>
+  <td>{{ name }}</td>
+  <td>{{ row.rounds }}</td>
+  <td>{{ row.kos }}</td>
+  <td>{{ row.trainers }}</td>
+  <td>{{ row.extra }}</td>
 </tr>
 {% endfor %}
 </table>
@@ -83,7 +86,11 @@ TPL = """
 @app.route("/board")
 def board():
     db = load_db()
-    rows = sorted(db.items(), key=lambda kv: (kv[1]["rounds"], kv[1]["kos"]), reverse=True)
+    rows = sorted(
+        db.items(),
+        key=lambda kv: (kv[1].get("rounds", 0), kv[1].get("kos", 0)),
+        reverse=True
+    )
     return render_template_string(TPL, rows=rows)
 
 # (tuỳ chọn) phục vụ file tĩnh nếu bạn có /static
@@ -93,3 +100,4 @@ def static_files(fname):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
