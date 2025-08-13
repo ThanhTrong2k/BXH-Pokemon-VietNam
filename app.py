@@ -261,7 +261,11 @@ def upload_team_image():
     return redirect(url_for('board', lang=lang))
 # ==================
 
+@app.get("/health")
+def health():
+    return "ok", 200
 
 if __name__ == "__main__":
     # Local dev
     app.run(debug=True)
+
