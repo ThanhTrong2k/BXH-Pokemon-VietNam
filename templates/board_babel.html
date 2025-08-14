@@ -52,9 +52,12 @@
 
     /* container dùng width co giãn, tránh 100vw để không dính scrollbar-width */
     .shell{
-      width:min(1200px, 100% - 32px);
+      max-width:1200px;
       margin:0 auto;
-      padding:24px 0;
+      /* padding 2 bên luôn nằm trong màn hình và tôn trọng tai thỏ */
+      padding:24px 16px;
+      padding-left:  max(16px, env(safe-area-inset-left));
+      padding-right: max(16px, env(safe-area-inset-right));
     }
 
     header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:20px}
@@ -68,6 +71,9 @@
     .muted{color:var(--muted);font-size:.95rem}
 
     .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    /* BƯỚC 2: Cho flex-item trong header có thể co lại */
+    header, .brand, .toolbar { min-width: 0; }     /* rất quan trọng */
+    .toolbar > * { min-width: 0; max-width: 100%; } /* input/select/button không bị tràn */
     .select{
       appearance:none;border:1px solid #2b3a62;background:#101833;color:var(--text);
       padding:10px 12px;border-radius:12px;cursor:pointer;outline:none;flex:0 1 auto
@@ -123,6 +129,19 @@
     /* 4) (tuỳ chọn) nếu sau này dùng dvw – override an toàn */
     @supports (width: 100dvw) { /* không bắt buộc, để sẵn cho background động */
       .use-dvw { width: 100dvw; }
+    }
+    
+    /* BƯỚC 4: Giới hạn nền trang trí full-bleed không tràn màn hình */
+    #bg, .full-bleed {
+      position: fixed;
+      inset: 0;
+      max-width: 100vw;       /* không rộng hơn viewport */
+      overflow: hidden;       /* cắt phần dư nếu có */
+      pointer-events: none;   /* không cản click */
+    }
+    #bg img, .full-bleed img { 
+      max-width: 100%;
+      height: auto;
     }
   </style>
 </head>
@@ -335,7 +354,16 @@
       void document.body.offsetWidth;
       setTimeout(() => { document.documentElement.style.overflowX = ''; }, 400);
     }, {passive:true});
+    
+    // ép trình duyệt reflow nhẹ khi xoay / đổi kích thước
+    function _reflowFix(){
+      document.documentElement.style.overflowX = 'hidden';
+      void document.body.offsetWidth;            // touch layout
+      setTimeout(()=>{ document.documentElement.style.overflowX=''; }, 250);
+    }
+    window.addEventListener('orientationchange', _reflowFix, {passive:true});
+    window.addEventListener('resize', _reflowFix, {passive:true});
   </script>
-
 </body>
 </html>
+
