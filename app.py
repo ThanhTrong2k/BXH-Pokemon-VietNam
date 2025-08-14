@@ -146,53 +146,55 @@ TPL = r"""
 <title>BXH Pokémon Việt Nam</title>
 <style>
 :root{
-  --bg:#f7f8fc; --fg:#0b1021; --card:#ffffff; --accent:#ffcc00; --accent2:#3b4cca;
-  --muted:#8a8fa3; --border:#e6e8f2; --row:#fafbff;
-}
-@media (prefers-color-scheme: dark){
-  :root{ --bg:#0e111a; --fg:#e6e9f5; --card:#121623; --accent2:#7289da;
-         --muted:#aab1c6; --border:#242a3a; --row:#151a28; }
+  --bg:#0e111a; --fg:#e8ebf7; --card:#101627; --accent:#ffcc00; --accent2:#3b4cca;
+  --muted:#a7aec6; --border:#20273a; --row:#0f1424;
 }
 *{box-sizing:border-box}
 body{
   margin:0;
   background:
-    radial-gradient(1200px 800px at 10% -10%, rgba(255,204,0,.08), transparent),
+    radial-gradient(1200px 800px at 10% -10%, rgba(255,204,0,.06), transparent),
     radial-gradient(900px 700px at 110% 10%, rgba(59,76,202,.10), transparent),
     var(--bg);
   color:var(--fg);
   font:500 16px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Helvetica Neue,Arial,Noto Sans,sans-serif;
 }
-.container{max-width:980px;margin:24px auto;padding:0 16px}
+.container{max-width:1060px;margin:24px auto;padding:0 16px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;
-      box-shadow:0 8px 30px rgba(0,0,0,.06);overflow:hidden}
+      box-shadow:0 10px 30px rgba(0,0,0,.25);overflow:hidden}
 .header{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);
-        background:linear-gradient(to right, rgba(255,204,0,.12), rgba(59,76,202,.12))}
+        background:linear-gradient(to right, rgba(255,204,0,.10), rgba(59,76,202,.10))}
+.left{display:flex;align-items:center;gap:12px;flex:1}
 .logo{width:28px;height:28px;display:inline-block}
 .h1{font-size:20px;font-weight:800;letter-spacing:.3px}
-.controls{display:flex;gap:10px;margin-left:auto}
-input[type=search]{appearance:none;border:1px solid var(--border);background:transparent;color:var(--fg);
-  padding:8px 10px;border-radius:10px;min-width:160px}
-.refresh{border:1px solid var(--border);background:transparent;padding:8px 10px;border-radius:10px;cursor:pointer}
+.sprites{display:flex;gap:6px;opacity:.9}
+.sprites img{width:28px;height:28px;image-rendering:pixelated;filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));}
+.controls{display:flex;gap:8px;align-items:center}
+input[type=search], select, button{
+  appearance:none;border:1px solid var(--border);background:#0b1222;color:var(--fg);
+  padding:8px 10px;border-radius:10px
+}
+button{cursor:pointer}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);
+       font-variant-numeric:tabular-nums;background:#0b1222}
+.medal-1{background:linear-gradient(180deg,#fff3bf,#ffe066);color:#111;border-color:#ffd43b}
+.medal-2{background:linear-gradient(180deg,#f1f3f5,#dee2e6);color:#111;border-color:#adb5bd}
+.medal-3{background:linear-gradient(180deg,#ffe8cc,#ffc078);color:#111;border-color:#ffa94d}
 .table-wrap{overflow:auto}
 table{width:100%;border-collapse:separate;border-spacing:0}
 th,td{padding:12px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
 th{position:sticky;top:0;background:var(--card);z-index:1;font-size:13px;color:var(--muted);
    text-transform:uppercase;letter-spacing:.08em}
 tbody tr:nth-child(even){background:var(--row)}
-.rank{font-weight:800;text-align:center}
+.rank{text-align:center;font-weight:800}
 .name{font-weight:700}
-.badge{display:inline-flex;align-items:center;gap:6px;padding:2px 8px;border-radius:999px;border:1px solid var(--border);
-       font-variant-numeric:tabular-nums}
-.medal-1{background:linear-gradient(180deg,#fff3bf,#ffe066);border-color:#ffd43b}
-.medal-2{background:linear-gradient(180deg,#f1f3f5,#dee2e6);border-color:#adb5bd}
-.medal-3{background:linear-gradient(180deg,#ffe8cc,#ffc078);border-color:#ffa94d}
 .footer{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;color:var(--muted);font-size:13px}
-@media (max-width:640px){
+.music{display:flex;align-items:center;gap:6px}
+.music .title{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:13px}
+@media (max-width:720px){
   .h1{font-size:18px}
   th,td{padding:10px 12px}
-  .controls{gap:6px}
-  input[type=search]{min-width:120px}
+  .controls{flex-wrap:wrap;justify-content:flex-end}
 }
 </style>
 </head>
@@ -200,16 +202,39 @@ tbody tr:nth-child(even){background:var(--row)}
 <div class="container">
   <div class="card">
     <div class="header">
-      <!-- Pokéball mini bằng SVG -->
-      <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <circle cx="16" cy="16" r="14" stroke="var(--accent2)" stroke-width="4"/>
-        <path d="M2 16h28" stroke="var(--fg)" stroke-width="4"/>
-        <circle cx="16" cy="16" r="5" fill="var(--accent)" stroke="var(--fg)" stroke-width="2"/>
-      </svg>
-      <div class="h1">BXH Pokémon Việt Nam</div>
+      <div class="left">
+        <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+          <circle cx="16" cy="16" r="14" stroke="var(--accent2)" stroke-width="4"/>
+          <path d="M2 16h28" stroke="var(--fg)" stroke-width="4"/>
+          <circle cx="16" cy="16" r="5" fill="var(--accent)" stroke="var(--fg)" stroke-width="2"/>
+        </svg>
+        <div class="h1">BXH Pokémon Việt Nam</div>
+        <div class="sprites" aria-hidden="true">
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png" alt="">
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/6.png" alt="">
+          <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/3.png" alt="">
+        </div>
+      </div>
       <div class="controls">
         <input id="q" type="search" placeholder="Tìm người chơi…">
-        <button class="refresh" onclick="location.reload()">↻ Tải lại</button>
+        <select id="sortBy" title="Sắp xếp">
+          <option value="default">Mặc định (T↓ K↓ R↓ E↓)</option>
+          <option value="kos">KOs cao nhất</option>
+          <option value="rounds">Rounds cao nhất</option>
+          <option value="extra">Extra cao nhất</option>
+        </select>
+        <button onclick="location.reload()">↻ Tải lại</button>
+        {% if tracks|length > 0 %}
+        <div class="music">
+          <button id="btnPlay" title="Phát/Tạm dừng">♫ Play</button>
+          <button id="btnNext" title="Bài ngẫu nhiên tiếp theo">⏭</button>
+          <span class="title" id="songTitle"></span>
+          <audio id="player" preload="none" crossorigin="anonymous"></audio>
+          <script>
+            const tracks = {{ tracks|tojson }};
+          </script>
+        </div>
+        {% endif %}
       </div>
     </div>
 
@@ -227,17 +252,16 @@ tbody tr:nth-child(even){background:var(--row)}
         </thead>
         <tbody>
           {% for name, row in rows %}
-          <tr>
+          <tr data-name="{{ name|lower }}"
+              data-rounds="{{ row.rounds }}"
+              data-kos="{{ row.kos }}"
+              data-trainers="{{ row.trainers }}"
+              data-extra="{{ row.extra }}">
             <td class="rank">
-              {% if loop.index==1 %}
-                <span class="badge medal-1">🥇 {{loop.index}}</span>
-              {% elif loop.index==2 %}
-                <span class="badge medal-2">🥈 {{loop.index}}</span>
-              {% elif loop.index==3 %}
-                <span class="badge medal-3">🥉 {{loop.index}}</span>
-              {% else %}
-                <span class="badge">{{loop.index}}</span>
-              {% endif %}
+              {% if loop.index==1 %}<span class="badge medal-1">🥇 {{loop.index}}</span>
+              {% elif loop.index==2 %}<span class="badge medal-2">🥈 {{loop.index}}</span>
+              {% elif loop.index==3 %}<span class="badge medal-3">🥉 {{loop.index}}</span>
+              {% else %}<span class="badge">{{loop.index}}</span>{% endif %}
             </td>
             <td class="name">{{ name }}</td>
             <td>{{ row.rounds }}</td>
@@ -258,32 +282,106 @@ tbody tr:nth-child(even){background:var(--row)}
 </div>
 
 <script>
+// ---- Filter theo tên ----
 const q = document.getElementById('q');
 q?.addEventListener('input', () => {
   const term = q.value.toLowerCase();
   document.querySelectorAll('#board tbody tr').forEach(tr => {
-    const name = tr.children[1].textContent.toLowerCase();
-    tr.style.display = name.includes(term) ? '' : 'none';
+    tr.style.display = tr.dataset.name.includes(term) ? '' : 'none';
   });
 });
+
+// ---- Sort client-side ----
+const sortBy = document.getElementById('sortBy');
+function sortTable(mode){
+  const tbody = document.querySelector('#board tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  const keyDefault = r => [+(r.dataset.trainers||0), +(r.dataset.kos||0), +(r.dataset.rounds||0), +(r.dataset.extra||0)];
+  const keyKos     = r => [+(r.dataset.kos||0), +(r.dataset.trainers||0), +(r.dataset.rounds||0), +(r.dataset.extra||0)];
+  const keyRounds  = r => [+(r.dataset.rounds||0), +(r.dataset.trainers||0), +(r.dataset.kos||0), +(r.dataset.extra||0)];
+  const keyExtra   = r => [+(r.dataset.extra||0), +(r.dataset.trainers||0), +(r.dataset.kos||0), +(r.dataset.rounds||0)];
+  const getKey = (r) => (mode==='kos'?keyKos(r):mode==='rounds'?keyRounds(r):mode==='extra'?keyExtra(r):keyDefault(r));
+  rows.sort((a,b) => {
+    const ka=getKey(a), kb=getKey(b);
+    for(let i=0;i<ka.length;i++){ if(kb[i]!==ka[i]) return kb[i]-ka[i]; }
+    return a.dataset.name.localeCompare(b.dataset.name);
+  });
+  rows.forEach((r,i)=>{
+    // cập nhật huy chương & thứ hạng
+    const cell = r.querySelector('.rank');
+    const rank = i+1;
+    const medal = rank===1?'🥇':rank===2?'🥈':rank===3?'🥉':'';
+    cell.innerHTML = medal
+      ? `<span class="badge medal-${rank}">${medal} ${rank}</span>`
+      : `<span class="badge">${rank}</span>`;
+    tbody.appendChild(r);
+  });
+}
+sortBy?.addEventListener('change', ()=>sortTable(sortBy.value));
+
+// ---- Nhạc (chỉ khi có tracks & user gesture) ----
+(function(){
+  const player = document.getElementById('player');
+  if(!player) return;
+  const title = document.getElementById('songTitle');
+  const btnPlay = document.getElementById('btnPlay');
+  const btnNext = document.getElementById('btnNext');
+  let idx = Math.floor(Math.random()*tracks.length);
+
+  function setSrc(i){
+    idx = (i+tracks.length)%tracks.length;
+    player.src = tracks[idx];
+    title.textContent = tracks[idx].split('/').pop();
+  }
+  function next(){ setSrc(idx+1); player.play().catch(()=>{}); }
+
+  setSrc(idx);
+
+  btnPlay.addEventListener('click', ()=>{
+    if(player.paused){ player.play().catch(()=>{}); btnPlay.textContent = "⏸ Pause"; }
+    else{ player.pause(); btnPlay.textContent = "♫ Play"; }
+  });
+  btnNext.addEventListener('click', next);
+  player.addEventListener('ended', next);
+})();
 </script>
 </body>
 </html>
 """
 
-from datetime import datetime, timezone
+
+from datetime import datetime
+import os
 
 @app.route("/")
 @app.route("/board")
 def board():
     db = load_db()
+
+    # Mặc định: Trainers ↓, KOs ↓, Rounds ↓, Extra ↓
     rows = sorted(
         db.items(),
-        key=lambda kv: (kv[1].get("rounds", 0), kv[1].get("kos", 0)),
+        key=lambda kv: (
+            kv[1].get("trainers", 0),
+            kv[1].get("kos", 0),
+            kv[1].get("rounds", 0),
+            kv[1].get("extra", 0),
+        ),
         reverse=True
     )
+
+    # Quét file nhạc trong /static/bgm
+    tracks = []
+    try:
+        base = os.path.join(os.path.dirname(__file__), "static", "bgm")
+        for f in os.listdir(base):
+            if f.lower().endswith((".mp3", ".ogg", ".m4a", ".wav")):
+                tracks.append(f"/static/bgm/{f}")
+    except Exception:
+        pass
+
     now = datetime.now().strftime("%H:%M:%S")
-    return render_template_string(TPL, rows=rows, updated_at=now)
+    return render_template_string(TPL, rows=rows, updated_at=now, tracks=tracks)
 
 @app.route("/static/<path:fname>")
 def static_files(fname):
@@ -320,4 +418,5 @@ def send_form():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
