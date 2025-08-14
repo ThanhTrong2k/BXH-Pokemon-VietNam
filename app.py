@@ -58,28 +58,9 @@ def load_db():
     return data
 
 def save_db(db):
-    """
-    Tương thích clear(): nếu db == {} -> TRUNCATE.
-    Không dùng ở report().
-    """
     with db_conn() as con, con.cursor() as cur:
-        if not db:
-            cur.execute("TRUNCATE TABLE scores")
-            return
-        # nếu ai đó gọi save_db với dữ liệu đầy đủ
-        for name, row in db.items():
-            cur.execute("""
-              INSERT INTO scores(name, rounds, kos, trainers, extra)
-              VALUES (%s,%s,%s,%s,%s)
-              ON CONFLICT (name) DO UPDATE
-                 SET rounds=EXCLUDED.rounds,
-                     kos=EXCLUDED.kos,
-                     trainers=EXCLUDED.trainers,
-                     extra=EXCLUDED.extra,
-                     updated_at=now()
-            """, (name, row.get("rounds",0), row.get("kos",0),
-                  row.get("trainers",0), row.get("extra",0)))
-
+        cur.execute("TRUNCATE TABLE scores")
+        
 # ===== API =====
 @app.route("/api/health")
 def health():
@@ -408,6 +389,22 @@ def clear():
     save_db({})   # TRUNCATE
     return jsonify(ok=True)
 
+import secrets
+
+@app.route("/api/mint_uid", methods=["POST"])
+def mint_uid():
+    if (request.form.get("token") or "") != TOKEN:
+        return jsonify(error="bad token"), 401
+    # Tạo 12 bytes (96 bit) -> 24 hex, thêm tiền tố
+    while True:
+        uid = "RG1-" + secrets.token_hex(6).upper()   # 12 hex (~48bit) -> muốn mạnh hơn: token_hex(8..10)
+        # đảm bảo chưa tồn tại
+        with db_conn() as con, con.cursor() as cur:
+            cur.execute("SELECT 1 FROM scores WHERE uid=%s LIMIT 1", (uid,))
+            if not cur.fetchone():
+                break
+    return jsonify(ok=True, uid=uid)
+
 FORM = """
 <!doctype html><meta charset="utf-8"><title>Send</title>
 <h3>Gửi BXH (test)</h3>
@@ -428,6 +425,7 @@ def send_form():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
 
 
