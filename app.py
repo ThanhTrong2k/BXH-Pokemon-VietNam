@@ -180,9 +180,66 @@ tbody tr:nth-child(even){background:var(--row)}
   th,td{padding:10px 12px}
   .controls{flex-wrap:wrap;justify-content:flex-end}
 }
+/* === Decorative Pokémon & Motion === */
+.card{ position: relative; z-index: 2; }
+#bg{ position: fixed; inset:0; z-index:1; overflow:hidden; pointer-events:none; }
+.bg-mon{
+  position:absolute; opacity:.28; image-rendering:pixelated;
+  filter: drop-shadow(0 6px 14px rgba(0,0,0,.45));
+}
+
+/* Runner (chạy qua lại) */
+.bg-mon.run{
+  left:-12vw; bottom:8vh; width:100px; max-width:24vw;
+  animation: run-h 18s linear infinite alternate;
+}
+@keyframes run-h{
+  0%   { transform: translateX(0)        scaleX(1); }
+  49%  { transform: translateX(115vw)    scaleX(1); }
+  50%  { transform: translateX(115vw)    scaleX(-1); }
+  100% { transform: translateX(0)        scaleX(-1); }
+}
+
+/* Flyer (legend bay) */
+.bg-mon.fly{
+  right:-14vw; top:6vh; width:140px; max-width:32vw; opacity:.22;
+  animation: fly-diag 28s ease-in-out infinite alternate;
+}
+@keyframes fly-diag{
+  0%   { transform: translate(0,0) rotate(0deg); }
+  50%  { transform: translate(-55vw,10vh) rotate(6deg); }
+  100% { transform: translate(-8vw,-6vh) rotate(-6deg); }
+}
+
+/* Pikachu nhảy cạnh tiêu đề */
+.pika{
+  width:36px; height:36px; image-rendering:pixelated;
+  transform-origin: bottom center;
+  animation: pika-bounce 1.2s ease-in-out infinite;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));
+}
+@keyframes pika-bounce{
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-6px); }
+}
+
+/* Tôn trọng người dùng hạn chế chuyển động */
+@media (prefers-reduced-motion: reduce){
+  .bg-mon, .pika{ animation:none !important; }
+}
 </style>
 </head>
 <body>
+<div id="bg" aria-hidden="true">
+  <!-- Pokémon chạy (ví dụ Lucario 448) -->
+  <img class="bg-mon run"
+       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/448.gif"
+       alt="">
+  <!-- Legend bay (ví dụ Rayquaza 384) -->
+  <img class="bg-mon fly"
+       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/384.gif"
+       alt="">
+</div>
 <div class="container">
   <div class="card">
     <div class="header">
@@ -192,6 +249,9 @@ tbody tr:nth-child(even){background:var(--row)}
           <path d="M2 16h28" stroke="var(--fg)" stroke-width="4"/>
           <circle cx="16" cy="16" r="5" fill="var(--accent)" stroke="var(--fg)" stroke-width="2"/>
         </svg>
+        <img class="pika"
+             src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/25.gif"
+             alt="Pikachu">
         <div class="h1">BXH Pokémon Việt Nam</div>
         <div class="sprites" aria-hidden="true">
           <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png" alt="">
@@ -260,7 +320,7 @@ tbody tr:nth-child(even){background:var(--row)}
 
     <div class="footer">
       <span>Hiển thị {{ rows|length }} người chơi</span>
-      <span>⏱️ Cập nhật: {{ updated_at }}</span>
+      <span id="updatedAt">⏱️ Cập nhật: --:--:--</span>
     </div>
   </div>
 </div>
@@ -328,6 +388,15 @@ sortBy?.addEventListener('change', ()=>sortTable(sortBy.value));
   btnNext.addEventListener('click', next);
   player.addEventListener('ended', next);
 })();
+
+// ---- Local clock (hiển thị theo giờ thiết bị) ----
+function pad(n){ return n<10 ? '0'+n : n; }
+function setClock(){
+  const d=new Date();
+  const s = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const el=document.getElementById('updatedAt'); if(el) el.textContent = `⏱️ Cập nhật: ${s}`;
+}
+setClock(); setInterval(setClock, 1000);
 </script>
 </body>
 </html>
@@ -425,6 +494,7 @@ def send_form():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
 
 
