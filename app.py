@@ -1,41 +1,83 @@
+# app.py  — giữ nguyên API, chuyển lưu trữ sang Neon (Postgres)
 from flask import Flask, request, jsonify, render_template_string, send_from_directory
-import json, os, threading
-import traceback, sys, os, json, threading
+import json, os, threading, traceback, sys
+
+# >>> NEW <<<
+import psycopg
+from psycopg.rows import dict_row
 
 app = Flask(__name__)
 LOCK = threading.Lock()
 
-# Cho phép cấu hình nơi lưu dữ liệu (Render Disk)
-DATA_DIR = os.environ.get("DB_DIR", os.environ.get("RENDER_DISK_PATH", "."))
-if not os.path.isdir(DATA_DIR):
-    os.makedirs(DATA_DIR, exist_ok=True)
-DB_PATH = os.environ.get("DB_PATH", os.path.join(DATA_DIR, "db.json"))
-TOKEN   = os.environ.get("API_TOKEN", "POKEMONVIETNAM")
+# ====== CONFIG ======
+TOKEN         = os.environ.get("API_TOKEN", "POKEMONVIETNAM")
+DATABASE_URL  = os.environ.get("DATABASE_URL")  # lấy từ Neon
 
 def safe_int(x, default=0):
-    try:
-        return int(str(x).strip())
-    except:
-        return default
+    try: return int(str(x).strip())
+    except: return default
 
 def log(msg):
-    print(msg)
-    sys.stdout.flush()
+    print(msg); sys.stdout.flush()
 
-# ===== utils =====
+# ====== DB HELPERS (Postgres) ======
+def db_conn():
+    # autocommit để UPDATE/UPSERT chạy thẳng
+    if not DATABASE_URL:
+        raise RuntimeError("Missing DATABASE_URL (Neon)")
+    return psycopg.connect(DATABASE_URL, autocommit=True)
+
+def init_db():
+    with db_conn() as con, con.cursor() as cur:
+        cur.execute("""
+        CREATE TABLE IF NOT EXISTS scores (
+          name       TEXT PRIMARY KEY,
+          rounds     INTEGER NOT NULL DEFAULT 0,
+          kos        INTEGER NOT NULL DEFAULT 0,
+          trainers   INTEGER NOT NULL DEFAULT 0,
+          extra      INTEGER NOT NULL DEFAULT 0,
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+        """)
+init_db()
+
+# (giữ tên hàm cũ nhưng đọc/ghi từ Postgres để các view hiện tại không phải đổi)
 def load_db():
-    if os.path.exists(DB_PATH):
-        try:
-            with open(DB_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            return {}
-    return {}
+    """Trả về dict {name: {rounds, kos, trainers, extra}} từ Postgres."""
+    data = {}
+    with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
+        cur.execute("SELECT name, rounds, kos, trainers, extra FROM scores")
+        for r in cur.fetchall():
+            data[r["name"]] = {
+                "rounds":   int(r["rounds"]),
+                "kos":      int(r["kos"]),
+                "trainers": int(r["trainers"]),
+                "extra":    int(r["extra"]),
+            }
+    return data
 
 def save_db(db):
-    with LOCK:
-        with open(DB_PATH, "w", encoding="utf-8") as f:
-            json.dump(db, f, ensure_ascii=False, indent=2)
+    """
+    Tương thích clear(): nếu db == {} -> TRUNCATE.
+    Không dùng ở report().
+    """
+    with db_conn() as con, con.cursor() as cur:
+        if not db:
+            cur.execute("TRUNCATE TABLE scores")
+            return
+        # nếu ai đó gọi save_db với dữ liệu đầy đủ
+        for name, row in db.items():
+            cur.execute("""
+              INSERT INTO scores(name, rounds, kos, trainers, extra)
+              VALUES (%s,%s,%s,%s,%s)
+              ON CONFLICT (name) DO UPDATE
+                 SET rounds=EXCLUDED.rounds,
+                     kos=EXCLUDED.kos,
+                     trainers=EXCLUDED.trainers,
+                     extra=EXCLUDED.extra,
+                     updated_at=now()
+            """, (name, row.get("rounds",0), row.get("kos",0),
+                  row.get("trainers",0), row.get("extra",0)))
 
 # ===== API =====
 @app.route("/api/health")
@@ -60,26 +102,38 @@ def report():
         trainers = safe_int(data.get("trainers"))
         extra    = safe_int(data.get("extra"))
 
-        db  = load_db()
-        row = db.get(name, {"rounds":0,"kos":0,"trainers":0,"extra":0})
+        with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
+            if action == "delta":
+                # Cộng dồn (UPSERT)
+                cur.execute("""
+                  INSERT INTO scores(name, rounds, kos, trainers, extra)
+                  VALUES (%s,%s,%s,%s,%s)
+                  ON CONFLICT (name) DO UPDATE
+                    SET rounds   = scores.rounds   + EXCLUDED.rounds,
+                        kos      = scores.kos      + EXCLUDED.kos,
+                        trainers = scores.trainers + EXCLUDED.trainers,
+                        extra    = scores.extra    + EXCLUDED.extra,
+                        updated_at = now()
+                """, (name, rounds, kos, trainers, extra))
+            else:
+                # Ghi tuyệt đối (UPSERT)
+                cur.execute("""
+                  INSERT INTO scores(name, rounds, kos, trainers, extra)
+                  VALUES (%s,%s,%s,%s,%s)
+                  ON CONFLICT (name) DO UPDATE
+                    SET rounds   = EXCLUDED.rounds,
+                        kos      = EXCLUDED.kos,
+                        trainers = EXCLUDED.trainers,
+                        extra    = EXCLUDED.extra,
+                        updated_at = now()
+                """, (name, rounds, kos, trainers, extra))
 
-        if action == "delta":
-            row["rounds"]   += rounds
-            row["kos"]      += kos
-            row["trainers"] += trainers
-            row["extra"]    += extra
-        else:  # set
-            row["rounds"]   = rounds
-            row["kos"]      = kos
-            row["trainers"] = trainers
-            row["extra"]    = extra
+            cur.execute("SELECT rounds, kos, trainers, extra FROM scores WHERE name=%s", (name,))
+            row = cur.fetchone()
 
-        db[name] = row
-        save_db(db)
         return jsonify(ok=True, name=name, **row)
     except Exception as e:
         log(f"[REPORT][ERROR] {e}\n{traceback.format_exc()}")
-        # Trả lỗi có diễn giải thay vì 500 trắng
         return jsonify(error="internal", detail=str(e)), 500
 
 # ===== View BXH =====
@@ -113,24 +167,21 @@ def board():
     )
     return render_template_string(TPL, rows=rows)
 
-# (tuỳ chọn) phục vụ file tĩnh nếu bạn có /static
 @app.route("/static/<path:fname>")
 def static_files(fname):
     return send_from_directory("static", fname)
-# --- Xem DB thô ---
+
 @app.route("/api/raw")
 def raw():
     return jsonify(load_db())
 
-# --- Reset DB (chỉ cho chủ) ---
 @app.route("/api/clear", methods=["POST"])
 def clear():
     if (request.form.get("token") or "") != TOKEN:
         return jsonify(error="bad token"), 401
-    save_db({})
+    save_db({})   # TRUNCATE
     return jsonify(ok=True)
 
-# --- Form gửi tay để test ---
 FORM = """
 <!doctype html><meta charset="utf-8"><title>Send</title>
 <h3>Gửi BXH (test)</h3>
@@ -151,6 +202,3 @@ def send_form():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
-
-
-
