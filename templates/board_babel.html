@@ -3,51 +3,127 @@
 <html lang="{{ cur if cur else 'vi' }}">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- 1) Viewport đã thêm maximum-scale + viewport-fit -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>{{ _('Leaderboard') }}</title>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#0b1020;--card:#121a33cc;--muted:#8da2c0;--text:#e6eeff;--accent:#6aa3ff;--accent-2:#8b5cf6;--radius:16px;--ring:0 0 0 3px rgba(106,163,255,.35);--glass-blur:saturate(160%) blur(6px)}
-    *{box-sizing:border-box}html,body{height:100%}
-    body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--text);
-      background:radial-gradient(1200px 600px at -10% -10%,#1a2455 0%,transparent 60%),
-                 radial-gradient(1200px 600px at 110% 10%,#2a3f83 0%,transparent 60%),
-                 radial-gradient(1200px 800px at 50% 120%,#1a2f5a 0%,transparent 60%),var(--bg)}
-    .shell{max-width:1200px;margin:0 auto;padding:24px}
+    :root{
+      --bg:#0b1020;
+      --card:#121a33cc;
+      --muted:#8da2c0;
+      --text:#e6eeff;
+      --accent:#6aa3ff;
+      --accent-2:#8b5cf6;
+      --radius:16px;
+      --ring:0 0 0 3px rgba(106,163,255,.35);
+      --glass-blur:saturate(160%) blur(6px)
+    }
+
+    *{box-sizing:border-box}
+
+    /* 2) Chống tràn ngang + tôn trọng safe-area (tai thỏ) */
+    html,body{
+      height:100%;
+      width:100%;
+      max-width:100%;
+      overflow-x:hidden;
+      -webkit-text-size-adjust:100%;
+      text-size-adjust:100%;
+    }
+    @supports (padding: max(0px)) {
+      body{
+        padding-left:  max(0px, env(safe-area-inset-left));
+        padding-right: max(0px, env(safe-area-inset-right));
+      }
+    }
+
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at -10% -10%,#1a2455 0%,transparent 60%),
+        radial-gradient(1200px 600px at 110% 10%,#2a3f83 0%,transparent 60%),
+        radial-gradient(1200px 800px at 50% 120%,#1a2f5a 0%,transparent 60%),
+        var(--bg);
+    }
+
+    /* container dùng width co giãn, tránh 100vw để không dính scrollbar-width */
+    .shell{
+      width:min(1200px, 100% - 32px);
+      margin:0 auto;
+      padding:24px 0;
+    }
+
     header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:20px}
     .brand{display:flex;gap:12px;align-items:center}
-    .logo{inline-size:40px;block-size:40px;border-radius:10px;display:grid;place-items:center;
+    .logo{
+      inline-size:40px;block-size:40px;border-radius:10px;display:grid;place-items:center;
       background:linear-gradient(135deg,var(--accent),var(--accent-2));
-      box-shadow:0 10px 30px rgba(107,114,255,.35),inset 0 0 24px rgba(255,255,255,.15)}
+      box-shadow:0 10px 30px rgba(107,114,255,.35),inset 0 0 24px rgba(255,255,255,.15)
+    }
     .title{font-weight:800;font-size:1.25rem;letter-spacing:.2px}
     .muted{color:var(--muted);font-size:.95rem}
-    .toolbar{display:flex;gap:10px;align-items:center}
-    .select{appearance:none;border:1px solid #2b3a62;background:#101833;color:var(--text);padding:10px 12px;border-radius:12px;cursor:pointer;outline:none}
-    .btn{border:none;border-radius:12px;padding:10px 14px;color:white;cursor:pointer;font-weight:600;
-      background:linear-gradient(135deg,var(--accent),var(--accent-2));box-shadow:0 8px 20px rgba(106,163,255,.35);
-      transition:transform .12s ease,box-shadow .12s ease}
-    .btn:hover{transform:translateY(-1px)}.btn:focus-visible{box-shadow:var(--ring)}
-    .hero{position:relative;overflow:hidden;border-radius:var(--radius);padding:22px 20px;background:#0f1732a6;backdrop-filter:var(--glass-blur);border:1px solid #263159}
-    .hero h1{margin:0 0 6px 0;font-size:1.6rem}.hero p{margin:0;color:var(--muted)}
+
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .select{
+      appearance:none;border:1px solid #2b3a62;background:#101833;color:var(--text);
+      padding:10px 12px;border-radius:12px;cursor:pointer;outline:none;flex:0 1 auto
+    }
+    .btn{
+      border:none;border-radius:12px;padding:10px 14px;color:white;cursor:pointer;font-weight:600;
+      background:linear-gradient(135deg,var(--accent),var(--accent-2));
+      box-shadow:0 8px 20px rgba(106,163,255,.35);
+      transition:transform .12s ease,box-shadow .12s ease;flex:0 1 auto
+    }
+    .btn:hover{transform:translateY(-1px)}
+    .btn:focus-visible{box-shadow:var(--ring)}
+
+    .hero{
+      position:relative;overflow:hidden;border-radius:var(--radius);padding:22px 20px;
+      background:#0f1732a6;backdrop-filter:var(--glass-blur);border:1px solid #263159
+    }
+    .hero h1{margin:0 0 6px 0;font-size:1.6rem}
+    .hero p{margin:0;color:var(--muted)}
     .chips{margin-top:12px;display:flex;gap:10px;flex-wrap:wrap}
     .chip{border:1px solid #2b3a62;border-radius:999px;padding:6px 10px;color:#c9d6ff;background:#0e1631c2;font-size:.85rem}
+
     .grid{display:grid;gap:16px;margin-top:18px;grid-template-columns:repeat(12,1fr)}
     @media (max-width:960px){.grid{grid-template-columns:repeat(6,1fr)}}
     @media (max-width:640px){.grid{grid-template-columns:repeat(1,1fr)}}
-    .card{grid-column:span 4;min-height:160px;background:#0f1732a6;backdrop-filter:var(--glass-blur);border:1px solid #263159;border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px}
-    .card--wide{grid-column:span 8}.card__head{display:flex;align-items:center;justify-content:space-between}
-    .card__title{font-weight:700}.kpi{font-size:2rem;font-weight:800}.sub{color:var(--muted);font-size:.9rem}
-    .table{width:100%;border-collapse:collapse;font-size:.95rem}
-    .table th,.table td{padding:10px;border-bottom:1px solid #22305a}
+
+    .card{
+      grid-column:span 4;min-height:160px;background:#0f1732a6;backdrop-filter:var(--glass-blur);
+      border:1px solid #263159;border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px
+    }
+    .card--wide{grid-column:span 8}
+    .card__head{display:flex;align-items:center;justify-content:space-between}
+    .card__title{font-weight:700}
+    .kpi{font-size:2rem;font-weight:800}
+    .sub{color:var(--muted);font-size:.9rem}
+
+    /* Bảng: đảm bảo không nở quá khung ở mobile */
+    .table{width:100%;border-collapse:collapse;font-size:.95rem;table-layout:auto}
+    .table th,.table td{padding:10px;border-bottom:1px solid #22305a;white-space:nowrap}
     .table th{color:#a9b8e8;text-align:left;font-weight:700}
+
     .row{display:flex;align-items:center;gap:10px}
-    .rank{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:#101a3a;border:1px solid #2b3a62;color:#cfe0ff;font-weight:700}
+    .rank{
+      width:28px;height:28px;display:grid;place-items:center;border-radius:8px;
+      background:#101a3a;border:1px solid #2b3a62;color:#cfe0ff;font-weight:700
+    }
     .tag{border:1px solid #2b3a62;border-radius:8px;padding:4px 8px;color:#cfe0ff;background:#0e1631c2;font-size:.8rem}
+
     .footer{margin:22px 0 8px 0;color:#90a1c9;font-size:.85rem;opacity:.9}
-	.teamcell{display:flex;align-items:center;gap:8px}
+    .teamcell{display:flex;align-items:center;gap:8px}
     .teamcell img{width:28px;height:28px;border-radius:6px;border:1px solid #2b3a62;background:#0e1631}
 
+    /* 4) (tuỳ chọn) nếu sau này dùng dvw – override an toàn */
+    @supports (width: 100dvw) { /* không bắt buộc, để sẵn cho background động */
+      .use-dvw { width: 100dvw; }
+    }
   </style>
 </head>
 <body>
@@ -69,9 +145,10 @@
           <option value="vi" {% if cur == 'vi' %}selected{% endif %}>Tiếng Việt</option>
           <option value="en" {% if cur == 'en' %}selected{% endif %}>English</option>
         </select>
-		<button class="btn" onclick="openUpload()">{{ _('Upload Team Image') }}</button>
+        <button class="btn" onclick="openUpload()">{{ _('Upload Team Image') }}</button>
         <button class="btn">{{ _('New Match') }}</button>
       </div>
+
       <!-- Modal upload -->
       <div id="uploadModal" style="position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(6,10,25,.55);backdrop-filter:blur(3px);z-index:9999">
         <div style="width:min(520px,92vw);background:#0f1732; border:1px solid #263159; border-radius:16px; padding:16px">
@@ -175,84 +252,90 @@
       <div class="card__head">
         <div class="card__title">{{ _('Leaderboard') }}</div>
       </div>
-      <table class="table" id="leaderboard">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>{{ _('Player') }}</th>
-            <th>{{ _('Trainer') }}</th>
-            <th>{{ _('Rounds') }}</th>
-            <th>{{ _('KOs') }}</th>
-            <th>{{ _('Team') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in leaderboard %}
-          <tr>
-            <td>{{ row.rank }}</td>
-            <td>{{ row.player }}</td>
-            <td>{{ row.trainer }}</td>
-            <td>{{ row.rounds }}</td>
-            <td>{{ row.kos }}</td>
+      <div class="table-wrap" style="overflow:auto">
+        <table class="table" id="leaderboard">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>{{ _('Player') }}</th>
+              <th>{{ _('Trainer') }}</th>
+              <th>{{ _('Rounds') }}</th>
+              <th>{{ _('KOs') }}</th>
+              <th>{{ _('Team') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in leaderboard %}
+            <tr>
+              <td>{{ row.rank }}</td>
+              <td>{{ row.player }}</td>
+              <td>{{ row.trainer }}</td>
+              <td>{{ row.rounds }}</td>
+              <td>{{ row.kos }}</td>
 
-          <!-- Cột Đội hình + thumbnail -->
-          <td class="teamcell">
-            {% if row.team_thumb_url %}
-              <a href="{{ row.team_img_url }}" target="_blank" title="Open full image">
-                <img src="{{ row.team_thumb_url }}" alt="Team image">
-              </a>
-            {% endif %}
-            <span>{{ row.team }}</span>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-
-      </table>
+              <!-- Cột Đội hình + thumbnail -->
+              <td class="teamcell">
+                {% if row.team_thumb_url %}
+                  <a href="{{ row.team_img_url }}" target="_blank" title="Open full image">
+                    <img src="{{ row.team_thumb_url }}" alt="Team image">
+                  </a>
+                {% endif %}
+                <span>{{ row.team }}</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </section>
 
+    <p class="footer">{{ _('Rendered with mobile-safe layout & orientation fixes') }}</p>
   </div>
 
   <script>
     function onLangChange(value){
-      // đổi bằng cookie route
       location.href = "/set-language/" + value;
-      // hoặc nếu bạn muốn dùng query ?lang=:
-      // const u = new URL(location.href); u.searchParams.set('lang', value); location.href = u.toString();
     }
-	
+
     function openUpload(){
       const m = document.getElementById('uploadModal');
-	  if (m) m.style.display = 'flex';
+      if (m) m.style.display = 'flex';
     }
-	
-	function closeUpload(){
+
+    function closeUpload(){
       const m = document.getElementById('uploadModal');
       if (m) m.style.display = 'none';
     }
-	
-	function validateTeamNames(){
+
+    function validateTeamNames(){
       const raw = (document.getElementById('team_names')?.value || '');
       const names = raw.split(/[,\n;]+/).map(s => s.trim()).filter(Boolean);
       if (names.length === 0 || names.length > 6) {
         alert('Vui lòng nhập từ 1 đến 6 tên Pokémon, cách nhau bằng dấu phẩy.');
         return false;
       }
-      for (const n of names) { if (n.length > 30) { alert('Tên Pokémon quá dài.'); return false; } }
+      for (const n of names) {
+        if (n.length > 30) { alert('Tên Pokémon quá dài.'); return false; }
+      }
       return true;
     }
-	
-	// (khuyên dùng) UX: bấm Esc hoặc click nền tối để đóng modal
-    document.addEventListener('keydown', (e)=>{
-      if (e.key === 'Escape') closeUpload();
-    });
+
+    // UX: bấm Esc hoặc click nền tối để đóng modal
+    document.addEventListener('keydown', (e)=>{ if (e.key === 'Escape') closeUpload(); });
     document.addEventListener('click', (e)=>{
       const m = document.getElementById('uploadModal');
       if (!m) return;
       if (m.style.display === 'flex' && e.target === m) closeUpload();
     });
-</script>
+
+    // 3) Ép reflow nhẹ khi đổi orientation để reset tính toán viewport (Safari/Chrome mobile)
+    window.addEventListener('orientationchange', () => {
+      document.documentElement.style.overflowX = 'hidden';
+      // kích hoạt đọc lại layout
+      void document.body.offsetWidth;
+      setTimeout(() => { document.documentElement.style.overflowX = ''; }, 400);
+    }, {passive:true});
+  </script>
 
 </body>
 </html>
-
