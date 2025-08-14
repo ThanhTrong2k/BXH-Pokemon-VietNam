@@ -31,7 +31,8 @@ def init_db():
     with db_conn() as con, con.cursor() as cur:
         cur.execute("""
         CREATE TABLE IF NOT EXISTS scores (
-          name       TEXT PRIMARY KEY,
+          uid        TEXT PRIMARY KEY,
+          name       TEXT NOT NULL,
           rounds     INTEGER NOT NULL DEFAULT 0,
           kos        INTEGER NOT NULL DEFAULT 0,
           trainers   INTEGER NOT NULL DEFAULT 0,
@@ -90,13 +91,15 @@ def report():
         data = request.form.to_dict() or (request.get_json(silent=True) or {})
         log(f"[REPORT] payload={data}")
 
-        if not data:
-            return jsonify(error="no data"), 400
-        if data.get("token") != TOKEN:
-            return jsonify(error="bad token"), 401
+        if not data:                         return jsonify(error="no data"), 400
+        if data.get("token") != TOKEN:       return jsonify(error="bad token"), 401
 
         action   = (data.get("action") or "set").lower()
         name     = (data.get("name")   or "Unknown").strip()[:40]
+        uid      = (data.get("uid")    or "").strip()
+        if not uid:
+            uid = "__name__:" + name  # tương thích game cũ
+
         rounds   = safe_int(data.get("rounds"))
         kos      = safe_int(data.get("kos"))
         trainers = safe_int(data.get("trainers"))
@@ -104,34 +107,34 @@ def report():
 
         with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
             if action == "delta":
-                # Cộng dồn (UPSERT)
                 cur.execute("""
-                  INSERT INTO scores(name, rounds, kos, trainers, extra)
-                  VALUES (%s,%s,%s,%s,%s)
-                  ON CONFLICT (name) DO UPDATE
-                    SET rounds   = scores.rounds   + EXCLUDED.rounds,
-                        kos      = scores.kos      + EXCLUDED.kos,
+                  INSERT INTO scores(uid, name, rounds, kos, trainers, extra)
+                  VALUES (%s,%s,%s,%s,%s,%s)
+                  ON CONFLICT (uid) DO UPDATE
+                    SET name = EXCLUDED.name,
+                        rounds = scores.rounds + EXCLUDED.rounds,
+                        kos = scores.kos + EXCLUDED.kos,
                         trainers = scores.trainers + EXCLUDED.trainers,
-                        extra    = scores.extra    + EXCLUDED.extra,
+                        extra = scores.extra + EXCLUDED.extra,
                         updated_at = now()
-                """, (name, rounds, kos, trainers, extra))
+                """, (uid, name, rounds, kos, trainers, extra))
             else:
-                # Ghi tuyệt đối (UPSERT)
                 cur.execute("""
-                  INSERT INTO scores(name, rounds, kos, trainers, extra)
-                  VALUES (%s,%s,%s,%s,%s)
-                  ON CONFLICT (name) DO UPDATE
-                    SET rounds   = EXCLUDED.rounds,
-                        kos      = EXCLUDED.kos,
+                  INSERT INTO scores(uid, name, rounds, kos, trainers, extra)
+                  VALUES (%s,%s,%s,%s,%s,%s)
+                  ON CONFLICT (uid) DO UPDATE
+                    SET name = EXCLUDED.name,
+                        rounds = EXCLUDED.rounds,
+                        kos = EXCLUDED.kos,
                         trainers = EXCLUDED.trainers,
-                        extra    = EXCLUDED.extra,
+                        extra = EXCLUDED.extra,
                         updated_at = now()
-                """, (name, rounds, kos, trainers, extra))
+                """, (uid, name, rounds, kos, trainers, extra))
 
-            cur.execute("SELECT rounds, kos, trainers, extra FROM scores WHERE name=%s", (name,))
+            cur.execute("SELECT name, rounds, kos, trainers, extra FROM scores WHERE uid=%s", (uid,))
             row = cur.fetchone()
 
-        return jsonify(ok=True, name=name, **row)
+        return jsonify(ok=True, uid=uid, **row)
     except Exception as e:
         log(f"[REPORT][ERROR] {e}\n{traceback.format_exc()}")
         return jsonify(error="internal", detail=str(e)), 500
@@ -351,34 +354,41 @@ sortBy?.addEventListener('change', ()=>sortTable(sortBy.value));
 
 
 from datetime import datetime
-import os
+import os, re
+
+def short_code(uid):
+    if uid.startswith("__name__:"):  # bản cũ
+        return ""
+    # lấy 4 ký tự cuối chữ-số làm “mã”
+    s = re.sub(r"[^A-Z0-9]", "", uid.upper())
+    return s[-4:] if len(s) >= 4 else s
 
 @app.route("/")
 @app.route("/board")
 def board():
-    db = load_db()
+    with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
+        cur.execute("""
+          SELECT uid, name, rounds, kos, trainers, extra
+          FROM scores
+          ORDER BY trainers DESC, kos DESC, rounds DESC, extra DESC, updated_at DESC
+        """)
+        recs = cur.fetchall()
 
-    # Mặc định: Trainers ↓, KOs ↓, Rounds ↓, Extra ↓
-    rows = sorted(
-        db.items(),
-        key=lambda kv: (
-            kv[1].get("trainers", 0),
-            kv[1].get("kos", 0),
-            kv[1].get("rounds", 0),
-            kv[1].get("extra", 0),
-        ),
-        reverse=True
-    )
+    # hiển thị "Tên · CODE" nếu có uid thật
+    rows = []
+    for r in recs:
+        code = short_code(r["uid"])
+        display = r["name"] + (f" · {code}" if code else "")
+        rows.append((display, {"rounds":r["rounds"],"kos":r["kos"],"trainers":r["trainers"],"extra":r["extra"]}))
 
-    # Quét file nhạc trong /static/bgm
+    # nhạc trong /static/bgm (giữ như bạn đã cài)
     tracks = []
     try:
         base = os.path.join(os.path.dirname(__file__), "static", "bgm")
         for f in os.listdir(base):
-            if f.lower().endswith((".mp3", ".ogg", ".m4a", ".wav")):
+            if f.lower().endswith((".mp3",".ogg",".m4a",".wav")):
                 tracks.append(f"/static/bgm/{f}")
-    except Exception:
-        pass
+    except: pass
 
     now = datetime.now().strftime("%H:%M:%S")
     return render_template_string(TPL, rows=rows, updated_at=now, tracks=tracks)
@@ -418,5 +428,6 @@ def send_form():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
 
