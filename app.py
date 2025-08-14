@@ -180,78 +180,49 @@ tbody tr:nth-child(even){background:var(--row)}
   th,td{padding:10px 12px}
   .controls{flex-wrap:wrap;justify-content:flex-end}
 }
-/* === Decorative Pokémon & Motion === */
+
+/* === Decorative Pokémon (random, không đè BXH) === */
 .card{ position: relative; z-index: 2; }
 #bg{ position: fixed; inset:0; z-index:1; overflow:hidden; pointer-events:none; }
-.bg-mon{
+
+.sticker{
   position:absolute; opacity:.28; image-rendering:pixelated;
   filter: drop-shadow(0 6px 14px rgba(0,0,0,.45));
+  transform-origin:center;
+  animation: floaty 6s ease-in-out infinite;
+}
+@keyframes floaty{
+  0%,100%{ transform: translateY(0) rotate(0deg); }
+  50%    { transform: translateY(-10px) rotate(2deg); }
 }
 
-/* Runner (chạy qua lại) */
-.bg-mon.run{
-  left:-12vw; bottom:8vh; width:100px; max-width:24vw;
-  animation: run-h 18s linear infinite alternate;
-}
-@keyframes run-h{
-  0%   { transform: translateX(0)        scaleX(1); }
-  49%  { transform: translateX(115vw)    scaleX(1); }
-  50%  { transform: translateX(115vw)    scaleX(-1); }
-  100% { transform: translateX(0)        scaleX(-1); }
-}
-
-/* Flyer (legend bay) */
-.bg-mon.fly{
-  right:-14vw; top:6vh; width:140px; max-width:32vw; opacity:.22;
-  animation: fly-diag 28s ease-in-out infinite alternate;
-}
-@keyframes fly-diag{
-  0%   { transform: translate(0,0) rotate(0deg); }
-  50%  { transform: translate(-55vw,10vh) rotate(6deg); }
-  100% { transform: translate(-8vw,-6vh) rotate(-6deg); }
-}
-
-/* Pikachu nhảy cạnh tiêu đề */
+/* Pikachu nhảy cạnh tiêu đề (đặt đúng chỗ trong HTML, KHÔNG để trong <style>) */
 .pika{
   width:36px; height:36px; image-rendering:pixelated;
   transform-origin: bottom center;
   animation: pika-bounce 1.2s ease-in-out infinite;
   filter: drop-shadow(0 2px 2px rgba(0,0,0,.35));
 }
-@keyframes pika-bounce{
-  0%,100% { transform: translateY(0); }
-  50%     { transform: translateY(-6px); }
-}
+@keyframes pika-bounce{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
 
-/* Tôn trọng người dùng hạn chế chuyển động */
+/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce){
-  .bg-mon, .pika{ animation:none !important; }
+  .sticker,.pika{ animation:none !important; }
 }
 </style>
 </head>
 <body>
 <div id="bg" aria-hidden="true">
-  <!-- Pokémon chạy (ví dụ Lucario 448) -->
-  <img class="bg-mon run"
-       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/448.gif"
-       alt="">
-  <!-- Legend bay (ví dụ Rayquaza 384) -->
-  <img class="bg-mon fly"
-       src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/384.gif"
-       alt="">
+  <img id="stA" class="sticker" src="/static/stickers/arceus.gif"      alt="">
+  <img id="stB" class="sticker" src="/static/stickers/psyduck.gif"      alt="">
+  <img id="stC" class="sticker" src="/static/stickers/sprigatito.png"   alt="">
 </div>
 <div class="container">
   <div class="card">
-    <div class="header">
+    <div class="header" id="hdr">
       <div class="left">
-        <svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true">
-          <circle cx="16" cy="16" r="14" stroke="var(--accent2)" stroke-width="4"/>
-          <path d="M2 16h28" stroke="var(--fg)" stroke-width="4"/>
-          <circle cx="16" cy="16" r="5" fill="var(--accent)" stroke="var(--fg)" stroke-width="2"/>
-        </svg>
-        <img class="pika"
-             src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/25.gif"
-             alt="Pikachu">
+        <svg class="logo" ...>...</svg>
+        <img class="pika" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/25.gif" alt="Pikachu">
         <div class="h1">BXH Pokémon Việt Nam</div>
         <div class="sprites" aria-hidden="true">
           <img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png" alt="">
@@ -397,6 +368,56 @@ function setClock(){
   const el=document.getElementById('updatedAt'); if(el) el.textContent = `⏱️ Cập nhật: ${s}`;
 }
 setClock(); setInterval(setClock, 1000);
+
+// Đặt 3 sticker vào các “safe zone” không đè header BXH
+(function(){
+  const elA = document.getElementById('stA'); // Arceus
+  const elB = document.getElementById('stB'); // Psyduck
+  const elC = document.getElementById('stC'); // Sprigatito
+  const hdr = document.getElementById('hdr');
+
+  // Các vùng an toàn theo % màn hình (vw, vh)
+  // Đã chọn để Arceus lệch phải trên, Psyduck giữa phải, Sprigatito dưới trái — nhưng còn random trong vùng.
+  const zones = [
+    {x:[58,78], y:[16,28], size:[12,16]}, // Arceus (trên-phải)
+    {x:[66,86], y:[38,52], size:[10,14]}, // Psyduck (giữa-phải)
+    {x:[6,18],  y:[70,86], size:[12,18]}, // Sprigatito (dưới-trái)
+  ];
+
+  function rnd(a,b){ return a + Math.random()*(b-a); }
+
+  function place(el, z){
+    if(!el) return;
+    const w = rnd(z.size[0], z.size[1]); // width theo vw
+    el.style.width = w + 'vw';
+    el.style.left  = rnd(z.x[0], z.x[1]) + 'vw';
+    el.style.top   = rnd(z.y[0], z.y[1]) + 'vh';
+  }
+
+  function layout(){
+    place(elA, zones[0]);
+    place(elB, zones[1]);
+    place(elC, zones[2]);
+
+    // đảm bảo không che header: nếu sticker lọt lên quá cao thì đẩy xuống
+    const hdrBtm = hdr.getBoundingClientRect().bottom;
+    [elA,elB,elC].forEach(el=>{
+      if(!el) return;
+      const r = el.getBoundingClientRect();
+      if(r.top < hdrBtm + 12){
+        const delta = (hdrBtm + 12) - r.top;
+        // convert delta px -> vh
+        const vh = (delta / window.innerHeight) * 100;
+        const curTop = parseFloat(el.style.top);
+        el.style.top = (curTop + vh) + 'vh';
+      }
+    });
+  }
+
+  layout();
+  // Re-layout khi thay đổi kích thước (debounce)
+  let t=null; window.addEventListener('resize', ()=>{ clearTimeout(t); t=setTimeout(layout, 150); });
+})();
 </script>
 </body>
 </html>
@@ -494,6 +515,7 @@ def send_form():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
 
 
