@@ -10,7 +10,7 @@ LOCK = threading.Lock()
 # ========= CONFIG =========
 TOKEN        = os.environ.get("API_TOKEN", "POKEMONVIETNAM")    # PC API token (giữ nguyên)
 DATABASE_URL = os.environ.get("DATABASE_URL")                   # Neon
-UPLOAD_KEY   = (os.environ.get("UPLOAD_KEY") or "CHANGE_ME")    # bí mật HMAC cho Android file
+UPLOAD_KEY   = (os.environ.get("UPLOAD_KEY") or "POKEMONVIETNAM")    # bí mật HMAC cho Android file
 
 def log(msg): print(msg); sys.stdout.flush()
 
@@ -104,9 +104,10 @@ def report_pc():
         return jsonify(error="internal", detail=str(e)), 500
 
 # ========= ANDROID UPLOAD =========
-def _hmac_sig(uid, name, action, rounds, kos, trainers, extra, ts):
+def _hmac_sig(uid, name, action, rounds, kos, trainers, extra, ts, alg="sha1"):
     msg = f"{uid}|{name}|{action}|{rounds}|{kos}|{trainers}|{extra}|{ts}"
-    return hmac.new(UPLOAD_KEY.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
+    digest = hashlib.sha1 if (alg or "").lower() == "sha1" else hashlib.sha256
+    return hmac.new(UPLOAD_KEY.encode("utf-8"), msg.encode("utf-8"), digest).hexdigest()
 
 def _parse_android_payload(raw_bytes):
     """
@@ -146,6 +147,11 @@ def upload_android():
         extra = int(str(data.get("extra") or 0))
         ts = int(str(data.get("ts") or 0))
         sig = str(data.get("sig") or "")
+        alg = (data.get("alg") or "sha1").lower()
+        good = _hmac_sig(uid, name, action, rounds, kos, trainers, extra, ts, alg)
+        if not hmac.compare_digest(good, sig):
+            return jsonify(error="bad signature"), 401
+
 
         if not uid or not ts or not sig:
             return jsonify(error="missing fields"), 400
@@ -320,7 +326,7 @@ def home(): return redirect(url_for("board_pc"))
 def board_pc():
     with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
         rows = _rows_from(cur, "scores")
-    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam — PC", rows=rows, show_upload=False)
+    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam — PC", rows=rows, show_upload=True)
 
 @app.route("/android")
 def board_android():
@@ -348,4 +354,5 @@ def clear_android():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
