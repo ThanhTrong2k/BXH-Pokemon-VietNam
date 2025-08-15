@@ -32,7 +32,8 @@ def init_db():
           extra      INTEGER NOT NULL DEFAULT 0,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )""")
-        # Android
+
+        # Android (có cả last_ts + last_sig để chống replay/duplicate)
         cur.execute("""
         CREATE TABLE IF NOT EXISTS android_scores (
           uid        TEXT PRIMARY KEY,
@@ -41,7 +42,8 @@ def init_db():
           kos        INTEGER NOT NULL DEFAULT 0,
           trainers   INTEGER NOT NULL DEFAULT 0,
           extra      INTEGER NOT NULL DEFAULT 0,
-          last_ts    BIGINT NOT NULL DEFAULT 0,      -- chống replay
+          last_ts    BIGINT NOT NULL DEFAULT 0,
+          last_sig   TEXT   NOT NULL DEFAULT '',
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )""")
 init_db()
@@ -148,15 +150,20 @@ def upload_android():
 
         with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
             # chống replay theo timestamp
-            cur.execute("SELECT last_ts FROM android_scores WHERE uid=%s", (uid,))
+            cur.execute("SELECT last_ts, last_sig FROM android_scores WHERE uid=%s", (uid,))
             row = cur.fetchone()
-            if row and ts <= int(row["last_ts"]):
-                return jsonify(error="stale", detail="older or equal timestamp"), 409
+            if row:
+                last_ts  = int(row["last_ts"] or 0)
+                last_sig = row["last_sig"] or ""
+                if ts < last_ts:
+                    return jsonify(error="stale", detail="older timestamp"), 409
+                if ts == last_ts and sig_client == last_sig:
+                    return jsonify(error="duplicate", detail="same payload"), 409
 
             if action == "delta":
                 cur.execute("""
-                  INSERT INTO android_scores(uid, name, rounds, kos, trainers, extra, last_ts)
-                  VALUES (%s,%s,%s,%s,%s,%s,%s)
+                  INSERT INTO android_scores(uid, name, rounds, kos, trainers, extra, last_ts, last_sig)
+                  VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                   ON CONFLICT (uid) DO UPDATE
                     SET name = EXCLUDED.name,
                         rounds = android_scores.rounds + EXCLUDED.rounds,
@@ -164,12 +171,13 @@ def upload_android():
                         trainers = android_scores.trainers + EXCLUDED.trainers,
                         extra = android_scores.extra + EXCLUDED.extra,
                         last_ts = GREATEST(android_scores.last_ts, EXCLUDED.last_ts),
+                        last_sig = EXCLUDED.last_sig,
                         updated_at = now()
-                """, (uid, name, rounds, kos, trainers, extra, ts))
+                """, (uid, name, rounds, kos, trainers, extra, ts, sig_client))
             else:
                 cur.execute("""
-                  INSERT INTO android_scores(uid, name, rounds, kos, trainers, extra, last_ts)
-                  VALUES (%s,%s,%s,%s,%s,%s,%s)
+                  INSERT INTO android_scores(uid, name, rounds, kos, trainers, extra, last_ts, last_sig)
+                  VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                   ON CONFLICT (uid) DO UPDATE
                     SET name = EXCLUDED.name,
                         rounds = EXCLUDED.rounds,
@@ -177,8 +185,9 @@ def upload_android():
                         trainers = EXCLUDED.trainers,
                         extra = EXCLUDED.extra,
                         last_ts = GREATEST(android_scores.last_ts, EXCLUDED.last_ts),
+                        last_sig = EXCLUDED.last_sig,
                         updated_at = now()
-                """, (uid, name, rounds, kos, trainers, extra, ts))
+                """, (uid, name, rounds, kos, trainers, extra, ts, sig_client))
 
         # Thành công -> chuyển ngay về BXH all
         return redirect(url_for("board_all"), code=303)
@@ -418,6 +427,7 @@ def clear_all():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
 
 
