@@ -194,6 +194,14 @@ TPL_BASE = r"""
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>{{ title }}</title>
 <style>
+/* Cột số: canh phải + tabular-nums để các chữ số có cùng độ rộng */
+th.num, td.num{
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+}
+td.name{ text-align: left; }
+td.rank{ text-align: center; }
 :root{--bg:#0e111a;--fg:#e8ebf7;--card:#101627;--muted:#a7aec6;--border:#20273a;--row:#0f1424;--accent:#ffcc00;--accent2:#3b4cca}
 *{box-sizing:border-box}
 html,body{width:100%;min-height:100%;margin:0;overflow-x:hidden}
@@ -266,18 +274,33 @@ tbody tr:nth-child(even){background:var(--row)}
     </div>
     <div class="table-wrap">
       <table id="board">
-        <thead>
-          <tr><th>#</th><th>Tên</th><th>Rounds</th><th>KOs</th><th>Trainers</th><th>Extra</th></tr>
-        </thead>
+      <colgroup>
+          <col style="width:72px">   <!-- # -->
+          <col>                       <!-- Tên (auto) -->
+          <col style="width:110px">   <!-- Rounds -->
+          <col style="width:110px">   <!-- KOs -->
+          <col style="width:120px">   <!-- Trainers -->
+          <col style="width:100px">   <!-- Extra -->
+      </colgroup>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tên</th>
+          <th class="num">Rounds</th>
+          <th class="num">KOs</th>
+          <th class="num">Trainers</th>
+          <th class="num">Extra</th>
+        </tr>
+      </thead>
         <tbody>
         {% for name, row in rows %}
           <tr data-name="{{ name|lower }}" data-rounds="{{ row.rounds }}" data-kos="{{ row.kos }}" data-trainers="{{ row.trainers }}" data-extra="{{ row.extra }}">
             <td class="rank"><span class="badge">{{ loop.index }}</span></td>
             <td class="name">{{ name }}</td>
-            <td>{{ row.rounds }}</td>
-            <td>{{ row.kos }}</td>
-            <td>{{ row.trainers }}</td>
-            <td>{{ row.extra }}</td>
+            <td class="num">{{ row.rounds }}</td>
+            <td class="num">{{ row.kos }}</td>
+            <td class="num">{{ row.trainers }}</td>
+            <td class="num">{{ row.extra }}</td>
           </tr>
         {% endfor %}
         </tbody>
@@ -386,3 +409,4 @@ def clear_android():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
