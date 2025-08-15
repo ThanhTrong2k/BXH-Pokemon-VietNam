@@ -239,28 +239,83 @@ tbody tr:nth-child(even){background:var(--row)}
 @media (max-width:720px){ th,td{padding:10px 12px} .controls{flex-wrap:wrap;justify-content:flex-end}}
 /* small upload pill */
 .upload-pill{display:flex;gap:8px;align-items:center}
+/* ==== Header responsive ==== */
+.headerbar{
+  display:grid;
+  grid-template-columns: 1fr auto;
+  align-items:center;
+  gap:12px;
+  overflow: visible;              /* tránh cắt nút ở iOS */
+}
+.header-title{ min-width: 220px; }
+
+.header-actions{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+}
+
+.header-actions .row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+
+.header-actions input[type="file"],
+.header-actions input[type="text"],
+.header-actions select,
+.header-actions button{
+  max-width:100%;
+}
+
+/* Tablet: chuyển sang 1 cột (tiêu đề trên, nút dưới) */
+@media (max-width: 880px){
+  .headerbar{ grid-template-columns: 1fr; }
+  .header-actions{ justify-content:flex-start; }
+}
+
+/* Mobile: xếp dọc các control cho gọn, không bị “rụng” nửa nút */
+@media (max-width: 560px){
+  .header-actions .row{ flex-direction:column; width:100%; }
+  .header-actions input[type="file"],
+  .header-actions input[type="text"],
+  .header-actions select,
+  .header-actions button{
+    width:100%;
+  }
+}
 </style>
 <div class="container">
   <div class="card">
-    <div class="header">
-      <div class="left">
+    <div class="header headerbar">
+      <div class="header-title">
         <div class="h1">{{ title }}</div>
       </div>
-      <div class="controls">
-        {% if show_upload %}
-        <form class="upload-pill" method="post" action="/api/upload_android" enctype="multipart/form-data">
-          <input type="file" name="file" accept=".bxh,.json,.txt" required>
-          <button type="submit">⬆︎ Upload file</button>
-        </form>
-        {% endif %}
-        <input id="q" type="search" placeholder="Tìm người chơi…">
-        <select id="sortBy">
-          <option value="default">Mặc định (T↓ K↓ R↓ E↓)</option>
-          <option value="kos">KOs cao nhất</option>
-          <option value="rounds">Rounds cao nhất</option>
-          <option value="extra">Extra cao nhất</option>
-        </select>
-        <button onclick="location.reload()">↻ Tải lại</button>
+
+      <div class="header-actions">
+        <!-- Hàng 1: Upload -->
+        <div class="row">
+          {% if show_upload %}
+          <form class="upload-pill" method="post" action="/api/upload_android" enctype="multipart/form-data">
+            <input type="file" name="file" id="bxhFile" accept=".bxh,.json,.txt" required>
+            <button id="btnUpload" type="submit">↑ Upload file</button>
+          </form>
+          {% endif %}
+       </div>
+
+        <!-- Hàng 2: Tìm kiếm + Lọc + Tải lại -->
+        <div class="row">
+          <input id="q" type="search" placeholder="Tìm người chơi…">
+          <select id="sortBy">
+            <option value="default">Mặc định (T↓ K↓ R↓ E↓)</option>
+            <option value="kos">KOs cao nhất</option>
+            <option value="rounds">Rounds cao nhất</option>
+            <option value="extra">Extra cao nhất</option>
+          </select>
+          <button id="btnReload" onclick="location.reload()">↻ Tải lại</button>
+        </div>
       </div>
     </div>
     <div class="table-wrap">
@@ -326,13 +381,13 @@ def home(): return redirect(url_for("board_pc"))
 def board_pc():
     with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
         rows = _rows_from(cur, "scores")
-    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam — PC", rows=rows, show_upload=True)
+    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam", rows=rows, show_upload=True)
 
 @app.route("/android")
 def board_android():
     with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
         rows = _rows_from(cur, "android_scores")
-    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam — Android", rows=rows, show_upload=True)
+    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam", rows=rows, show_upload=True)
 
 # static (nếu dùng)
 @app.route("/static/<path:fname>")
@@ -354,5 +409,6 @@ def clear_android():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
 
