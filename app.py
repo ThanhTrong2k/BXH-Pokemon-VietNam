@@ -407,7 +407,17 @@ def clear_android():
     with db_conn() as con, con.cursor() as cur: cur.execute("TRUNCATE TABLE android_scores")
     return jsonify(ok=True)
 
+@app.post("/api/clear")
+def clear_all():
+    if (request.form.get("token") or "") != TOKEN:
+        return jsonify(error="bad token"), 401
+    with db_conn() as con, con.cursor() as cur:
+        cur.execute("TRUNCATE TABLE scores")
+        cur.execute("TRUNCATE TABLE android_scores")
+    return jsonify(ok=True)
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
 
