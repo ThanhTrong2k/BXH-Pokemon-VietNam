@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for, send_from_directory
 import os, json, hmac, hashlib, base64, time, threading, traceback, sys
 import psycopg
+import hmac, hashlib, json
 from psycopg.rows import dict_row
 
 app = Flask(__name__)
@@ -12,6 +13,14 @@ DATABASE_URL = os.environ.get("DATABASE_URL")                   # Neon
 UPLOAD_KEY   = (os.environ.get("UPLOAD_KEY") or "CHANGE_ME")    # bí mật HMAC cho Android file
 
 def log(msg): print(msg); sys.stdout.flush()
+
+def verify(payload, secret):
+    alg = payload.get("alg", "sha256")  # mặc định sha256
+    body = payload["body"]
+    sig  = payload["sig"]
+    digest = hashlib.sha256 if alg == "sha256" else hashlib.sha1
+    expect = hmac.new(secret.encode("utf-8"), body.encode("utf-8"), digest).hexdigest()
+    return hmac.compare_digest(expect, sig)
 
 # ========= DB =========
 def db_conn():
@@ -339,3 +348,4 @@ def clear_android():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
