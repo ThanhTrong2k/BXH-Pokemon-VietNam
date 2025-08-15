@@ -194,14 +194,14 @@ TPL_BASE = r"""
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>{{ title }}</title>
 <style>
-/* Cột số: canh phải + tabular-nums để các chữ số có cùng độ rộng */
+/* Cột số: canh giữa + tabular-nums cho thẳng hàng */
 th.num, td.num{
-  text-align: right;
+  text-align: center;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "lnum" 1;
 }
-td.name{ text-align: left; }
-td.rank{ text-align: center; }
+td.name{ text-align: left; }   /* tên vẫn canh trái */
+td.rank{ text-align: center; } /* thứ hạng canh giữa */
 :root{--bg:#0e111a;--fg:#e8ebf7;--card:#101627;--muted:#a7aec6;--border:#20273a;--row:#0f1424;--accent:#ffcc00;--accent2:#3b4cca}
 *{box-sizing:border-box}
 html,body{width:100%;min-height:100%;margin:0;overflow-x:hidden}
@@ -409,4 +409,5 @@ def clear_android():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
+
 
