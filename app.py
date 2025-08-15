@@ -1,26 +1,17 @@
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for, send_from_directory
 import os, json, hmac, hashlib, base64, time, threading, traceback, sys
 import psycopg
-import hmac, hashlib, json
 from psycopg.rows import dict_row
 
 app = Flask(__name__)
 LOCK = threading.Lock()
 
 # ========= CONFIG =========
-TOKEN        = os.environ.get("API_TOKEN", "POKEMONVIETNAM")    # PC API token (giữ nguyên)
-DATABASE_URL = os.environ.get("DATABASE_URL")                   # Neon
-UPLOAD_KEY   = (os.environ.get("UPLOAD_KEY") or "POKEMONVIETNAM")    # bí mật HMAC cho Android file
+TOKEN        = os.environ.get("API_TOKEN", "POKEMONVIETNAM")         # PC API token
+DATABASE_URL = os.environ.get("DATABASE_URL")                        # Neon
+UPLOAD_KEY   = (os.environ.get("UPLOAD_KEY") or "POKEMONVIETNAM")    # = SECRET trong game
 
 def log(msg): print(msg); sys.stdout.flush()
-
-def verify(payload, secret):
-    alg = payload.get("alg", "sha256")  # mặc định sha256
-    body = payload["body"]
-    sig  = payload["sig"]
-    digest = hashlib.sha256 if alg == "sha256" else hashlib.sha1
-    expect = hmac.new(secret.encode("utf-8"), body.encode("utf-8"), digest).hexdigest()
-    return hmac.compare_digest(expect, sig)
 
 # ========= DB =========
 def db_conn():
@@ -30,7 +21,7 @@ def db_conn():
 
 def init_db():
     with db_conn() as con, con.cursor() as cur:
-        # PC: giữ nguyên (nếu bạn đã có table này thì lệnh CREATE IF NOT EXISTS sẽ bỏ qua)
+        # PC
         cur.execute("""
         CREATE TABLE IF NOT EXISTS scores (
           uid        TEXT PRIMARY KEY,
@@ -41,7 +32,7 @@ def init_db():
           extra      INTEGER NOT NULL DEFAULT 0,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )""")
-        # ANDROID: bảng riêng
+        # Android
         cur.execute("""
         CREATE TABLE IF NOT EXISTS android_scores (
           uid        TEXT PRIMARY KEY,
@@ -55,12 +46,12 @@ def init_db():
         )""")
 init_db()
 
-# ========= PC API (giữ y nguyên hành vi cũ) =========
+# ========= PC API =========
 @app.route("/api/report", methods=["POST"])
 def report_pc():
     try:
         data = request.form.to_dict() or (request.get_json(silent=True) or {})
-        if not data:                return jsonify(error="no data"), 400
+        if not data:                 return jsonify(error="no data"), 400
         if data.get("token") != TOKEN: return jsonify(error="bad token"), 401
 
         action   = (data.get("action") or "set").lower()
@@ -103,63 +94,57 @@ def report_pc():
         log(f"[PC][ERROR] {e}\n{traceback.format_exc()}")
         return jsonify(error="internal", detail=str(e)), 500
 
-# ========= ANDROID UPLOAD =========
-def _hmac_sig(uid, name, action, rounds, kos, trainers, extra, ts, alg="sha1"):
-    msg = f"{uid}|{name}|{action}|{rounds}|{kos}|{trainers}|{extra}|{ts}"
-    digest = hashlib.sha1 if (alg or "").lower() == "sha1" else hashlib.sha256
-    return hmac.new(UPLOAD_KEY.encode("utf-8"), msg.encode("utf-8"), digest).hexdigest()
+# ========= ANDROID UPLOAD (bytes-safe) =========
+def _parse_bxh_file(raw_bytes):
+    """Nhận .bxh base64(JSON) hoặc JSON thô -> dict (giữ nguyên bytes)."""
+    try:
+        raw_bytes = base64.b64decode(raw_bytes, validate=True)
+    except Exception:
+        pass
+    text = raw_bytes.decode("latin-1", "ignore")  # 1:1 bytes
+    return json.loads(text)
 
-def _parse_android_payload(raw_bytes):
-    """
-    Chấp nhận:
-      - JSON thuần (bytes bắt đầu bằng '{')
-      - base64(JSON)
-    Trả về dict hoặc raise ValueError.
-    """
-    data = None
-    s = raw_bytes.lstrip()
-    if s.startswith(b"{"):
-        data = json.loads(raw_bytes.decode("utf-8", "replace"))
-    else:
-        try:
-            dec = base64.b64decode(raw_bytes, validate=True)
-            data = json.loads(dec.decode("utf-8", "replace"))
-        except Exception:
-            raise ValueError("invalid file format")
-    return data
+def _msg_bytes(p):
+    # "#{uid}|#{name}|#{action}|#{rounds}|#{kos}|#{trainers}|#{extra}|#{ts}"
+    parts = [
+        str(p.get("uid","")).encode("ascii", "ignore"),
+        str(p.get("name","")).encode("latin-1", "ignore"),  # tên giữ nguyên bytes
+        str(p.get("action","")).encode("ascii", "ignore"),
+        str(int(p.get("rounds",0))).encode("ascii"),
+        str(int(p.get("kos",0))).encode("ascii"),
+        str(int(p.get("trainers",0))).encode("ascii"),
+        str(int(p.get("extra",0))).encode("ascii"),
+        str(int(p.get("ts",0))).encode("ascii"),
+    ]
+    return b"|".join(parts)
+
+def _calc_sig(p):
+    alg = (p.get("alg") or "sha1").lower()
+    digest = hashlib.sha1 if alg == "sha1" else hashlib.sha256
+    return hmac.new(UPLOAD_KEY.encode("ascii"), _msg_bytes(p), digest).hexdigest()
 
 @app.route("/api/upload_android", methods=["POST"])
 def upload_android():
     try:
-        if "file" not in request.files:
-            return jsonify(error="no file"), 400
-        f = request.files["file"]
-        raw = f.read()
-        data = _parse_android_payload(raw)
+        f = request.files.get("file")
+        if not f: return jsonify(error="no file"), 400
+        data = _parse_bxh_file(f.read())
 
-        # yêu cầu các trường
-        uid = str(data.get("uid") or "").strip()
-        name = (data.get("name") or "Unknown").strip()[:40]
-        action = (data.get("action") or "delta").lower()
-        rounds = int(str(data.get("rounds") or 0))
-        kos = int(str(data.get("kos") or 0))
+        # Verify
+        sig_client = str(data.get("sig",""))
+        if not sig_client: return jsonify(error="missing sig"), 400
+        sig_server = _calc_sig(data)
+        if not hmac.compare_digest(sig_client, sig_server):
+            return jsonify(error="bad signature"), 401
+
+        uid      = str(data.get("uid") or "").strip()
+        name     = (data.get("name") or "Unknown").strip()[:40]
+        action   = (data.get("action") or "delta").lower()
+        rounds   = int(str(data.get("rounds") or 0))
+        kos      = int(str(data.get("kos") or 0))
         trainers = int(str(data.get("trainers") or 0))
-        extra = int(str(data.get("extra") or 0))
-        ts = int(str(data.get("ts") or 0))
-        sig = str(data.get("sig") or "")
-        alg = (data.get("alg") or "sha1").lower()
-        good = _hmac_sig(uid, name, action, rounds, kos, trainers, extra, ts, alg)
-        if not hmac.compare_digest(good, sig):
-            return jsonify(error="bad signature"), 401
-
-
-        if not uid or not ts or not sig:
-            return jsonify(error="missing fields"), 400
-
-        # verify HMAC
-        good = _hmac_sig(uid, name, action, rounds, kos, trainers, extra, ts)
-        if not hmac.compare_digest(good, sig):
-            return jsonify(error="bad signature"), 401
+        extra    = int(str(data.get("extra") or 0))
+        ts       = int(str(data.get("ts") or 0))
 
         with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
             # chống replay theo timestamp
@@ -195,7 +180,8 @@ def upload_android():
                         updated_at = now()
                 """, (uid, name, rounds, kos, trainers, extra, ts))
 
-        return jsonify(ok=True, uid=uid, name=name, rounds=rounds, kos=kos, trainers=trainers, extra=extra)
+        # Thành công -> chuyển ngay về BXH all
+        return redirect(url_for("board_all"), code=303)
     except Exception as e:
         log(f"[ANDROID][ERROR] {e}\n{traceback.format_exc()}")
         return jsonify(error="internal", detail=str(e)), 500
@@ -239,53 +225,14 @@ tbody tr:nth-child(even){background:var(--row)}
 @media (max-width:720px){ th,td{padding:10px 12px} .controls{flex-wrap:wrap;justify-content:flex-end}}
 /* small upload pill */
 .upload-pill{display:flex;gap:8px;align-items:center}
-/* ==== Header responsive ==== */
-.headerbar{
-  display:grid;
-  grid-template-columns: 1fr auto;
-  align-items:center;
-  gap:12px;
-  overflow: visible;              /* tránh cắt nút ở iOS */
-}
+/* ==== Header responsive (mobile đẹp hơn) ==== */
+.headerbar{ display:grid; grid-template-columns: 1fr auto; align-items:center; gap:12px; overflow:visible; }
 .header-title{ min-width: 220px; }
-
-.header-actions{
-  display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  justify-content:flex-end;
-  gap:8px;
-}
-
-.header-actions .row{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-}
-
-.header-actions input[type="file"],
-.header-actions input[type="text"],
-.header-actions select,
-.header-actions button{
-  max-width:100%;
-}
-
-/* Tablet: chuyển sang 1 cột (tiêu đề trên, nút dưới) */
-@media (max-width: 880px){
-  .headerbar{ grid-template-columns: 1fr; }
-  .header-actions{ justify-content:flex-start; }
-}
-
-/* Mobile: xếp dọc các control cho gọn, không bị “rụng” nửa nút */
-@media (max-width: 560px){
-  .header-actions .row{ flex-direction:column; width:100%; }
-  .header-actions input[type="file"],
-  .header-actions input[type="text"],
-  .header-actions select,
-  .header-actions button{
-    width:100%;
-  }
-}
+.header-actions{ display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px; }
+.header-actions .row{ display:flex; flex-wrap:wrap; gap:8px; }
+.header-actions input[type="file"], .header-actions input[type="text"], .header-actions select, .header-actions button{ max-width:100%; }
+@media (max-width: 880px){ .headerbar{ grid-template-columns: 1fr; } .header-actions{ justify-content:flex-start; } }
+@media (max-width: 560px){ .header-actions .row{ flex-direction:column; width:100%; } .header-actions input[type="file"], .header-actions input[type="text"], .header-actions select, .header-actions button{ width:100%; } }
 </style>
 <div class="container">
   <div class="card">
@@ -303,8 +250,7 @@ tbody tr:nth-child(even){background:var(--row)}
             <button id="btnUpload" type="submit">↑ Upload file</button>
           </form>
           {% endif %}
-       </div>
-
+        </div>
         <!-- Hàng 2: Tìm kiếm + Lọc + Tải lại -->
         <div class="row">
           <input id="q" type="search" placeholder="Tìm người chơi…">
@@ -341,10 +287,8 @@ tbody tr:nth-child(even){background:var(--row)}
   </div>
 </div>
 <script>
-// Filter
 const q=document.getElementById('q');
 q?.addEventListener('input',()=>{const t=q.value.toLowerCase();document.querySelectorAll('#board tbody tr').forEach(tr=>{tr.style.display=tr.dataset.name.includes(t)?'':'none';});});
-// Sort
 const sortBy=document.getElementById('sortBy');
 function sortTable(mode){
   const tbody=document.querySelector('#board tbody');
@@ -374,27 +318,60 @@ def _rows_from(cur, table):
     )
     return rows
 
-@app.route("/")
-def home(): return redirect(url_for("board_pc"))
+# Gộp PC + Android
+def _rows_all(cur):
+    cur.execute("""
+      WITH u AS (
+        SELECT name, rounds, kos, trainers, extra FROM scores
+        UNION ALL
+        SELECT name, rounds, kos, trainers, extra FROM android_scores
+      )
+      SELECT name,
+             SUM(rounds)   AS rounds,
+             SUM(kos)      AS kos,
+             SUM(trainers) AS trainers,
+             SUM(extra)    AS extra
+      FROM u
+      GROUP BY name
+    """)
+    items = cur.fetchall()
+    rows = sorted(
+        [(r["name"], {
+            "rounds":   int(r["rounds"] or 0),
+            "kos":      int(r["kos"] or 0),
+            "trainers": int(r["trainers"] or 0),
+            "extra":    int(r["extra"] or 0),
+        }) for r in items],
+        key=lambda kv: (kv[1]["trainers"], kv[1]["kos"], kv[1]["rounds"], kv[1]["extra"]),
+        reverse=True
+    )
+    return rows
 
-@app.route("/pc")
-def board_pc():
+@app.route("/")
+def home():
+    return redirect(url_for("board_all"))
+
+@app.route("/all")
+def board_all():
     with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
-        rows = _rows_from(cur, "scores")
-    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam", rows=rows, show_upload=True)
+        rows = _rows_all(cur)
+    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam — ALL", rows=rows, show_upload=True)
+
+# Giữ route cũ nhưng chuyển hướng để không nhầm
+@app.route("/pc")
+def board_pc_redirect():
+    return redirect(url_for("board_all"))
 
 @app.route("/android")
-def board_android():
-    with db_conn() as con, con.cursor(row_factory=dict_row) as cur:
-        rows = _rows_from(cur, "android_scores")
-    return render_template_string(TPL_BASE, title="BXH Pokémon Việt Nam", rows=rows, show_upload=True)
+def board_android_redirect():
+    return redirect(url_for("board_all"))
 
 # static (nếu dùng)
 @app.route("/static/<path:fname>")
 def static_files(fname):
     return send_from_directory("static", fname)
 
-# tiện cho bạn reset mỗi bảng
+# tiện reset từng bảng (PC/Android)
 @app.route("/api/clear_pc", methods=["POST"])
 def clear_pc():
     if (request.form.get("token") or "") != TOKEN: return jsonify(error="bad token"), 401
@@ -409,6 +386,3 @@ def clear_android():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "10000")))
-
-
-
